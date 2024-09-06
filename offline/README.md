@@ -34,20 +34,20 @@ http://www.desy.de/~barty/cheetah/Cheetah/EuXFEL_data_analysis.html
 To get access to the analysis scripts in this repository, create a folder and clone the repository:
 
 ```
-git clone https://github.com/FXIhub/xfel2316.git
+git clone https://github.com/FXIhub/xfel7927.git
 
 ```
 
 This clones the repository to the current folder using HTTPS, which is fine for read access. To get write access to the repository, setup your SSH keys properly and do instead:
 
 ```
-git clone git@github.com:FXIhub/xfel2316.git
+git clone git@github.com:FXIhub/xfel7927.git
 ```
 
 Before you start performing your analysis, don't forget to load the proper modules:
 
 ```
-source xfel2316/source_this_at_euxfel
+source xfel7927/source_this_at_euxfel
 ```
 
 ## Experiment folder
@@ -55,7 +55,7 @@ source xfel2316/source_this_at_euxfel
 Once you login to the cluster you will start in your home directory. To go to the experiment directory, write:
 
 ```
-cd /gpfs/exfel/exp/SPB/201901/p002316
+cd /gpfs/exfel/exp/SPB/...
 ```
 
 This contains the `proc` folder for processed runs, `raw` folder for raw data runs, `usr` for smaller user files like software and calibration files and `scratch` for larger data files. Please make a folder in `scratch` with your UPEX user name and place your analysis output for the experiment there:
@@ -71,36 +71,8 @@ For sharing files with other users, please make sure they have the correct permi
 chmod 755 *
 ```
 
-## Module combiner
-
-AGIPD data is written in separate files for each module. The `combine_modules`
-python script combines the data from different modules and applies detector
-calibrations resulting in a detector image for a given run number and frame number.
-
-### Usage
-
-Here is some basic usage inside an `ipython` console.
-```python
-import combine_modules
-c = combine_modules.AGIPD_Combiner(18) # For run 18 with AgBe data
-frame = c.get_frame(8730, calibrate='true') # For frame number 8730
-
-# For XFEL-calibrated data (from the /proc folder)
-c = combine_modules.AGIPD_Combiner(18, raw=False)
-frame = c.get_frame(8730)
-```
-
-Note that the frame numbers are of just the cells which contain data. Thus, in 
-this experiment, there are currenty 176 frames per train, resulting in 1760 indices per second
-
-## Cheetah
-
-See online documentation for Cheetah at EuXFEL:
-
-http://www.desy.de/~barty/cheetah/Cheetah/At_EuXFEL.html
-
 ## VDS files
-An alternate way to look at the data is to use the virtual data set (VDS) feature of HDF5. These files can be generated with the `vds.py` script in this folder. Some runs should already be converted in the `/scratch/vds/` folder. These files have all the modules for a given train in the same dataset slice. Thus, one can use the simple HDF5/h5py API to access the data for a given frame.
+A useful way to look at the data is to use the virtual data set (VDS) feature of HDF5. These files can be generated with the `vds.py` script in this folder. Some runs should already be converted in the `/scratch/vds/` folder. These files have all the modules for a given train in the same dataset slice. Thus, one can use the simple HDF5/h5py API to access the data for a given frame.
 
 ```
 $ h5ls -r r0018_vds_raw.h5

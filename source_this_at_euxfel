@@ -1,6 +1,10 @@
 #!/bin/bash
 module load exfel exfel-python 
 
+# set experiment directory and number for bash and python scripts
+EXP_ID=7076
+EXP_PREFIX=/gpfs/exfel/exp/SPB/202421/p007076
+
 # This is pointing still to software installed for the xfel2013 experiment
 #export PATH=/gpfs/exfel/exp/SPB/201701/p002013/usr/Software/python-packages/bin:$PATH
 #export PYTHONPATH=/gpfs/exfel/exp/SPB/201701/p002013/usr/Software/python-packages/lib/python2.7/site-packages:$PYTHONPATH
@@ -13,7 +17,3 @@ module load exfel exfel-python
 # we probably wont run hummingbird from here
 # This is pointing still to the hummingbird installed for the xfel2013 experiment
 #export PATH=/gpfs/exfel/exp/SPB/201701/p002013/usr/Software/hummingbird:$PATH
-
-DIR=/gpfs/exfel/exp/SPB/202421/p007076/
-export EXP_DIR=$DIR
-export SCRATCH_DIR=${DIR}scratch
