@@ -1,5 +1,6 @@
 # credential files for autologger
 credentials*
+token*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
