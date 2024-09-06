@@ -1,5 +1,5 @@
 #!/bin/bash
-module load exfel exfel_anaconda3 
+module load exfel exfel-python
 
 # This is pointing still to software installed for the xfel2013 experiment
 #export PATH=/gpfs/exfel/exp/SPB/201701/p002013/usr/Software/python-packages/bin:$PATH
@@ -11,4 +11,4 @@ module load exfel exfel_anaconda3
 #export CPLUS_INCLUDE_PATH=/gpfs/exfel/exp/SPB/201701/p002013/usr/Software/python-packages/include:$CPLUS_INCLUDE_PATH
 
 # This is pointing still to the hummingbird installed for the xfel2013 experiment
-export PATH=/gpfs/exfel/exp/SPB/201701/p002013/usr/Software/hummingbird:$PATH
+#export PATH=/gpfs/exfel/exp/SPB/201701/p002013/usr/Software/hummingbird:$PATH
