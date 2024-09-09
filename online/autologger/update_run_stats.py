@@ -5,6 +5,7 @@ import json
 import numpy as np
 import datetime
 import authenticate_mdc
+from metadata_client.metadata_client import MetadataClient
 
 
 def deep_get(dictionary, keys, default=None):
@@ -27,6 +28,21 @@ def get_duration(s0, s1):
     d1 = datetime.datetime.fromisoformat(s1)
     return str(d1-d0)
 
+def get_calibrated_data_status(run_json):
+    if run_json['cal_num_requests'] == 0 :
+        out = 'not requested'
+    
+    else :
+        if run_json['cal_last_end_at'] is not None :
+            out = 'available'
+        
+        elif run_json['cal_last_begin_at'] is not None :
+            out = 'running'
+        
+        else :
+            out = 'not running'
+    return out
+
 # heading run_stats maping
 headings = OrderedDict([('Run number', lambda x: x['run_number']),
                         ('Date',       lambda x: get_date(x['begin_at'])),
@@ -37,108 +53,51 @@ headings = OrderedDict([('Run number', lambda x: x['run_number']),
                         ('Num Trains', lambda x: x['last_train'] - x['first_train']),
                         ('Num Pulses', lambda x: None),
                         ('Num Hits',   lambda x: None),
-                        ('Hit Rate',   lambda x: None)])
+                        ('Hit Rate',   lambda x: None),
+                        ('Calib',      lambda x: get_calibrated_data_status(x)),
+                        ('VDS',        lambda x: None),
+                        ('Events',     lambda x: None),
+                        ('Comments',   lambda x: None)])
 
-# remember experiment ids
-experiment_ids = []
 
-def get_experiment_id_from_run_id(run_id):
-    creds = authenticate_mdc.get()
-    run_stats = os.popen(
-    f"""
-    curl -X 'GET' \
-      'https://in.xfel.eu/metadata/api/runs/{run_id}' \
-      -H 'accept: application/json; version=1' \
-      -H 'X-USER-EMAIL: {creds['email']}' \
-      -H 'Authorization: Bearer {creds['token']}'
-    """).read()
-    
-    # list of dictionaries
-    run_stats = json.loads(run_stats)
-    
-    experiment_id = run_stats['experiment_id']
-    return experiment_id
+class Run_table():
+    """
+    Call the EuXFEL metadata catalog to get run info
+    This table can then be written to file or sent to a google sheet
+    """
 
-def get_experiment_ids_from_proposal_number(prop_no, creds):
-    print(f'getting proposal id from proposal number {prop_no}')
-    prop_stats = os.popen(
-    f"""
-    curl -X 'GET' \
-      'https://in.xfel.eu/metadata/api/proposals' \
-      --data number={prop_no} \
-      -H 'accept: application/json; version=1' \
-      -H 'X-USER-EMAIL: {creds['email']}' \
-      -H 'Authorization: Bearer {creds['token']}'
-    """).read()
-
-    # list of dictionaries
-    prop_stats = json.loads(prop_stats)
-
-    prop_id = prop_stats[0]['id']
-    print(f'proposal id: {prop_id}')
-    
-    print('getting experiment ids from proposal number')
-    exp_stats = os.popen(
-    f"""
-    curl -X 'GET' \
-      'https://in.xfel.eu/metadata/api/experiments' \
-      --data proposal_id={prop_id} \
-      -H 'accept: application/json; version=1' \
-      -H 'X-USER-EMAIL: {creds['email']}' \
-      -H 'Authorization: Bearer {creds['token']}'
-    """).read()
-
-    # list of dictionaries
-    exp_stats = json.loads(exp_stats)
-    
-    global experiment_ids 
-    experiment_ids = [exp['id'] for exp in exp_stats]
-    
-
-# I cannot get this to return all runs! actually this is becuase there are two different experiment ids in this proposal
-# it seems that every run type has its own experiment id... how to get run info based on run or proposal number?!
-def update_run_table(proposal_no):
-    creds = authenticate_mdc.get()
-
-    global experiment_ids
-    if len(experiment_ids) == 0 :
-        get_experiment_ids_from_proposal_number(proposal_no, creds)
+    def __init__(self, proposal_number, credentials = 'credentials_mdc.json'):
+        # communication object for requests to the mdc api
+        self.comm = authenticate_mdc.get(credentials)
+        self.proposal_number = proposal_number
         
-    print('calling EuXFEL metadata api')
-    run_stats = [] 
-    for experiment_id in experiment_ids :
-        call = f"""
-        curl -X 'GET' \
-          'https://in.xfel.eu/metadata/api/runs?experiment_id={experiment_id}' \
-          --data page_size=500 \
-          -H 'accept: application/json; version=1' \
-          -H 'X-USER-EMAIL: {creds['email']}' \
-          -H 'Authorization: Bearer {creds['token']}'
-        """
-        print(call)
-        run_json = os.popen(call).read()
+    def update(self): 
+        # dictionary
+        msg = MetadataClient.get_proposal_runs(self.comm, self.proposal_number)
         
-        # list of dictionaries
-        run_stats += json.loads(run_json)
-        print('found', len(run_stats),'runs in experiment', experiment_id)
+        print(msg.keys())
+        
+        assert(msg['success'] == True)
+        
+        run_stats = msg['data']['runs']
+        
+        # sort by run number
+        r = [run['run_number'] for run in run_stats]
+        runs_sorted = np.argsort(r)
+        
+        run_table = []
+        for r in runs_sorted:
+            run = run_stats[r]
+            row = []
+            for h, l in headings.items():
+                try :
+                    row.append(l(run))
+                except Exception as e:
+                    print(run)
+                    print(e)
+            
+            run_table.append(row)
+        
+        return [h for h in headings], run_table
 
-    print(json.dumps(run_stats, indent=2))
-    
-    # sort by run number
-    r = [run['run_number'] for run in run_stats]
-    runs_sorted = np.argsort(r)
-    
-    run_table = []
-    for r in runs_sorted:
-        run = run_stats[r]
-        row = []
-        for h, l in headings.items():
-            try :
-                row.append(l(run))
-            except Exception as e:
-                print(run)
-                print(e)
 
-        run_table.append(row)
-    
-    return [h for h in headings], run_table
