@@ -6,7 +6,12 @@ import numpy as np
 import datetime
 import authenticate_mdc
 from metadata_client.metadata_client import MetadataClient
+import socket
 
+PREFIX = os.environ['EXP_PREFIX']
+
+hostname = socket.gethostname()
+running_on_maxwell = 'desy' in hostname
 
 def deep_get(dictionary, keys, default=None):
     return reduce(lambda d, key: d.get(key, default) if isinstance(d, dict) else default, keys.split("."), dictionary)
@@ -34,7 +39,7 @@ def get_calibrated_data_status(run_json):
     
     else :
         if run_json['cal_last_end_at'] is not None :
-            out = 'available'
+            out = 'ready'
         
         elif run_json['cal_last_begin_at'] is not None :
             out = 'running'
@@ -43,21 +48,39 @@ def get_calibrated_data_status(run_json):
             out = 'not running'
     return out
 
-# heading run_stats maping
-headings = OrderedDict([('Run number', lambda x: x['run_number']),
-                        ('Date',       lambda x: get_date(x['begin_at'])),
-                        ('Start Time', lambda x: get_time(x['begin_at'])),
-                        ('Duration',   lambda x: get_duration(x['begin_at'], x['end_at'])),
-                        ('Run Type',   lambda x: deep_get(x, 'experiment.name')),
-                        ('Sample',     lambda x: deep_get(x, 'sample.name')),
-                        ('Num Trains', lambda x: x['last_train'] - x['first_train']),
-                        ('Num Pulses', lambda x: None),
-                        ('Num Hits',   lambda x: None),
-                        ('Hit Rate',   lambda x: None),
-                        ('Calib',      lambda x: get_calibrated_data_status(x)),
-                        ('VDS',        lambda x: None),
-                        ('Events',     lambda x: None),
-                        ('Comments',   lambda x: None)])
+def get_vds_file_status(run):
+    """
+    check for the existance of the file, e.g:
+        ${PREFIX}/scratch/vds/r0034.cxi
+    """
+    fnam = f'{PREFIX}/scratch/vds/r{run:04}.cxi'
+    if running_on_maxwell :
+        if os.path.exists(fnam):
+            out = 'ready'
+        else :
+            out = 'not ready'
+    else :
+        out = None
+    return out
+
+
+def get_events_file_status(run):
+    """
+    check for the existance of the file, e.g:
+        ${PREFIX}/scratch/events/events_r0034.h5
+    """
+    fnam = f'{PREFIX}/scratch/events/events_r{run:04}.h5'
+    if running_on_maxwell :
+        if os.path.exists(fnam):
+            out = 'ready'
+        else :
+            out = 'not ready'
+    else :
+        out = None
+    return out
+    
+    
+
 
 
 class Run_table():
@@ -70,6 +93,35 @@ class Run_table():
         # communication object for requests to the mdc api
         self.comm = authenticate_mdc.get(credentials)
         self.proposal_number = proposal_number
+
+        msg = MetadataClient.get_proposal_runs(self.comm, self.proposal_number)
+        self.proposal_id = msg['data']['proposal']['id']
+        
+        # get sample name by id for later
+        samples = self.comm.get_all_samples_by_proposal_id_api(self.proposal_id)
+        self.sample_names = {s['id']: s['name'] for s in samples.json()}
+
+        # get run type  by id for later
+        experiments = self.comm.get_all_experiments_by_proposal_id_api(self.proposal_id)
+        self.run_types = {s['id']: s['name'] for s in experiments.json()}
+
+        # heading run_stats maping
+        headings = OrderedDict([('Run number', lambda x: x['run_number']),
+                                ('Date',       lambda x: get_date(x['begin_at'])),
+                                ('Start Time', lambda x: get_time(x['begin_at'])),
+                                ('Duration',   lambda x: get_duration(x['begin_at'], x['end_at'])),
+                                ('Run Type',   lambda x: deep_get(x, 'experiment.name')),
+                                ('Run Type',   lambda x: self.run_types[x['experiment_id']]),
+                                ('Sample',     lambda x: self.sample_names[x['sample_id']]),
+                                ('Num Trains', lambda x: x['last_train'] - x['first_train']),
+                                ('Num Pulses', lambda x: None),
+                                ('Num Hits',   lambda x: None),
+                                ('Hit Rate',   lambda x: None),
+                                ('Calib',      lambda x: get_calibrated_data_status(x)),
+                                ('VDS',        lambda x: get_vds_file_status(x['run_number'])),
+                                ('Events',     lambda x: get_events_file_status(x['run_number'])),
+                                ('Comments',   lambda x: None)])
+        self.headings = headings
         
     def update(self): 
         # dictionary
@@ -89,15 +141,16 @@ class Run_table():
         for r in runs_sorted:
             run = run_stats[r]
             row = []
-            for h, l in headings.items():
-                try :
-                    row.append(l(run))
-                except Exception as e:
-                    print(run)
-                    print(e)
+            for h, l in self.headings.items():
+                row.append(l(run))
+                #try :
+                #    row.append(l(run))
+                #except Exception as e:
+                #    #print(run)
+                #    print(e)
             
             run_table.append(row)
         
-        return [h for h in headings], run_table
+        return [h for h in self.headings], run_table
 
 

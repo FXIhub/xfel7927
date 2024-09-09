@@ -1,4 +1,6 @@
 #!/bin/bash
+
+source /etc/profile.d/modules.sh
 module load exfel exfel-python 
 
 # set experiment directory and number for bash and python scripts
