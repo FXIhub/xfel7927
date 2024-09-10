@@ -16,6 +16,9 @@ parser.add_argument('-n', '--nproc',
 parser.add_argument('-o', '--out_folder', 
                     help='Path of output folder (default=%s/scratch/events/)'%PREFIX,
                     default=PREFIX+'/scratch/events/')
+parser.add_argument('--out_folder_powder', 
+                    help='Path of output folder (default=%s/scratch/powder/)'%PREFIX,
+                    default=PREFIX+'/scratch/powder/')
 args = parser.parse_args()
 
 import sys
@@ -48,39 +51,52 @@ class LitPixels():
         with h5py.File(vds_file, 'r') as f:
             self.dshape = f[VDS_DATASET].shape
 
-    def run_module(self, module):
-        sys.stdout.write('Calculating number of lit pixels in module %d for %d frames\n'%(module, self.dshape[0]))
+        # test
+        #self.frames  = 32 * 1000
+        
+        self.frames  = int(self.dshape[0])
+        self.modules = int(self.dshape[1])
+        self.pixels  = int(np.prod(self.dshape[2:]))
+        self.module_shape = self.dshape[2:]
+        self.frame_shape = self.dshape[1:]
+
+    def run_frame(self):
+        sys.stdout.write('Calculating number of lit pixels for all modules for %d frames\n'%(self.frames))
         sys.stdout.flush()
         
         # Litpixels for each module and each frame
-        litpix = mp.Array(ctypes.c_ulong, self.dshape[0])
+        litpix = mp.Array(ctypes.c_ulong, self.frames * self.modules)
         
         # photon counts for each module and each frame
-        intens = mp.Array(ctypes.c_ulong, self.dshape[0])
+        intens = mp.Array(ctypes.c_ulong, self.frames * self.modules)
         
         # powder for each module 
-        powder = mp.Array(ctypes.c_ulong, int(np.prod(self.dshape[2:])))
+        powder = mp.Array(ctypes.c_ulong, self.modules * self.pixels)
         
         jobs = []
         for c in range(self.nproc):
-            p = mp.Process(target=self._part_worker, args=(c, module, litpix, intens, powder))
+            p = mp.Process(target=self._part_worker, args=(c, litpix, intens, powder))
             jobs.append(p)
             p.start()
         
-        for j in jobs:
+        for i, j in enumerate(jobs):
+            sys.stdout.write(f'\n\nwaiting for job {i} to finish... ')
+            sys.stdout.flush()
             j.join()
+            sys.stdout.write(f'Done\n\n')
+            sys.stdout.flush()
         
-        self.litpix = np.frombuffer(litpix.get_obj(), dtype='u8')
-        self.intens = np.frombuffer(intens.get_obj(), dtype='u8')
-        self.powder = np.frombuffer(powder.get_obj(), dtype='u8').reshape(self.dshape[2:])
+        self.litpix = np.frombuffer(litpix.get_obj(), dtype='u8').reshape(self.frames, self.modules)
+        self.intens = np.frombuffer(intens.get_obj(), dtype='u8').reshape(self.frames, self.modules)
+        self.powder = np.frombuffer(powder.get_obj(), dtype='u8').reshape(self.frame_shape)
         return self.litpix, self.intens, self.powder
     
-    def _part_worker(self, p, m, litpix, intens, powder):
-        np_litpix = np.frombuffer(litpix.get_obj(), dtype='u8')
-        np_intens = np.frombuffer(intens.get_obj(), dtype='u8')
-        np_powder = np.frombuffer(powder.get_obj(), dtype='u8')
+    def _part_worker(self, p, litpix, intens, powder):
+        np_litpix = np.frombuffer(litpix.get_obj(), dtype='u8').reshape(self.frames, self.modules)
+        np_intens = np.frombuffer(intens.get_obj(), dtype='u8').reshape(self.frames, self.modules)
+        np_powder = np.frombuffer(powder.get_obj(), dtype='u8').reshape(self.frame_shape)
         
-        nframes = self.dshape[0]
+        nframes = self.frames
         my_start = (nframes // self.nproc) * p
         my_end = min((nframes // self.nproc) * (p+1), nframes)
         num_chunks = int(np.ceil((my_end-my_start)/self.chunk_size))
@@ -96,17 +112,17 @@ class LitPixels():
             pmax = min(my_start + (c+1) * self.chunk_size, my_end)
 
             # read vds file (assume photon units)
-            mask = f_vds[VDS_MASK_DATASET][pmin:pmax, m] == 0
-            cids = f_vds['entry_1/cellId'][pmin:pmax, m]
-            vals = f_vds[VDS_DATASET][pmin:pmax, m]
+            mask = f_vds[VDS_MASK_DATASET][pmin:pmax] == 0
+            cids = f_vds['entry_1/cellId'][pmin:pmax]
+            vals = f_vds[VDS_DATASET][pmin:pmax]
             
             # mask bad cells and pixels
             vals[np.isin(cids, BAD_CELLIDS)] = 0
             vals *= mask
             
-            np_litpix[pmin:pmax] = np.sum(vals>0, axis = (1,2))
-            np_intens[pmin:pmax] = np.sum(vals, axis = (1,2))
-            t = np.sum(vals, axis=0, dtype=np_powder.dtype).ravel()
+            np_litpix[pmin:pmax] = np.sum(vals>0, axis = (2,3))
+            np_intens[pmin:pmax] = np.sum(vals, axis = (2,3))
+            t = np.sum(vals, axis=0, dtype=np_powder.dtype)
             #print(np_powder.dtype, np_powder.shape, vals.dtype, vals.shape, t.dtype, t.shape)
             np_powder           += t
             
@@ -119,12 +135,14 @@ class LitPixels():
             sys.stdout.write('\n')
             sys.stdout.flush()
 
-vds_file  = PREFIX+'scratch/vds/r%.4d.cxi' %args.run
-out_fname = args.out_folder + os.path.splitext(os.path.basename(vds_file))[0] + '_events.h5'
+vds_file     = PREFIX+'scratch/vds/r%.4d.cxi' %args.run
+out_fname    = args.out_folder + os.path.splitext(os.path.basename(vds_file))[0] + '_events.h5'
+powder_fname = args.out_folder_powder + os.path.splitext(os.path.basename(vds_file))[0] + '_powder.h5'
 modules   = range(NMODULES)
 
 print(f'reading data from {vds_file}')
 print(f'output file       {out_fname}')
+print(f'powder file       {powder_fname}')
 
 # check that vds file exists
 assert(os.path.exists(vds_file))
@@ -139,14 +157,7 @@ l = LitPixels(vds_file, nproc=args.nproc)
 print('Running on the following modules:', modules)
 
 # get number of lit pixels, integrated photon counts and powder for each module
-litpixels = []
-photon_counts = []
-powder = []
-for module in modules:
-    lit, counts, powd = l.run_module(module)
-    litpixels.append(lit.copy())
-    photon_counts.append(counts.copy())
-    powder.append(powd.copy())
+litpixels, photon_counts, powder = l.run_frame()
 
 # get train, cell and pulse ID for each frame
 print('Copying IDs from VDS file')
@@ -159,10 +170,12 @@ with h5py.File(vds_file, 'r') as f_vds:
 with h5py.File(out_fname, 'a') as f:
     utils.update_h5(f, 'total_intens', np.array(photon_counts))
     utils.update_h5(f, 'litpixels', np.array(litpixels))
-    utils.update_h5(f, 'powder', np.array(powder))
     utils.update_h5(f, 'trainId', trainId)
     utils.update_h5(f, 'cellId', cellId)
     utils.update_h5(f, 'pulseId', pulseId)
+
+with h5py.File(powder_fname, 'a') as f:
+    utils.update_h5(f, 'powder', np.array(powder))
     
 print('DONE')
                 

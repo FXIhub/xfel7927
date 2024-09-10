@@ -7,8 +7,15 @@ import datetime
 import authenticate_mdc
 from metadata_client.metadata_client import MetadataClient
 import socket
+import glob
+import fnmatch
+import h5py
+import subprocess
+
+from constants import NPULSES_DATASET, NPULSES_DA_NUM
 
 PREFIX = os.environ['EXP_PREFIX']
+EXP_ID = os.environ['EXP_ID']
 
 hostname = socket.gethostname()
 running_on_maxwell = 'desy' in hostname
@@ -64,21 +71,51 @@ def get_vds_file_status(run):
     return out
 
 
-def get_events_file_status(run):
+def get_events_file_status(run, jobs):
     """
     check for the existance of the file, e.g:
         ${PREFIX}/scratch/events/events_r0034.h5
     """
     fnam = f'{PREFIX}/scratch/events/events_r{run:04}.h5'
+    out = None
     if running_on_maxwell :
         if os.path.exists(fnam):
             out = 'ready'
         else :
             out = 'not ready'
-    else :
-        out = None
+
+        if jobs :
+            s = f'*events*{EXP_ID}*-{run}"'
+            match = fnmatch.filter(jobs, s)
+            print(run, s, match)
+            if len(match) > 0:
+                out = 'running'
     return out
     
+
+def get_num_pulses(run):
+    npulses = None
+    if running_on_maxwell :
+        s = PREFIX+'/raw/r%.4d/*DA%.2d*.h5'%(run, NPULSES_DA_NUM)
+        flist = sorted(glob.glob(s))
+        if len(flist) > 0 :
+            with h5py.File(flist[0]) as f:
+                if NPULSES_DATASET in f:
+                    npulses = int(f[NPULSES_DATASET][0])
+    return npulses
+    
+
+def get_num_hits(run):
+    hits = None
+    if running_on_maxwell :
+        fnam = PREFIX + '/scratch/events/r%.4d_events.h5' % run
+        print(fnam, os.path.exists(fnam))
+        if os.path.exists(fnam) :
+            with h5py.File(fnam) as f:
+                if 'is_hit' in f :
+                    hits = np.sum(f['is_hit'][()])
+                    print(hits)
+    return hits
     
 
 
@@ -105,6 +142,12 @@ class Run_table():
         experiments = self.comm.get_all_experiments_by_proposal_id_api(self.proposal_id)
         self.run_types = {s['id']: s['name'] for s in experiments.json()}
 
+        # get running jobs on maxwell
+        jobs = None
+        if running_on_maxwell :
+            jobs = subprocess.run(['squeue', '--format="%.30j"'], stdout=subprocess.PIPE)
+            jobs = jobs.stdout.decode('utf-8').split('\n')
+        
         # heading run_stats maping
         headings = OrderedDict([('Run number', lambda x: x['run_number']),
                                 ('Date',       lambda x: get_date(x['begin_at'])),
@@ -114,12 +157,12 @@ class Run_table():
                                 ('Run Type',   lambda x: self.run_types[x['experiment_id']]),
                                 ('Sample',     lambda x: self.sample_names[x['sample_id']]),
                                 ('Num Trains', lambda x: x['last_train'] - x['first_train']),
-                                ('Num Pulses', lambda x: None),
-                                ('Num Hits',   lambda x: None),
+                                ('Num Pulses', lambda x: get_num_pulses(x['run_number'])),
+                                ('Num Hits',   lambda x: get_num_hits(x['run_number'])),
                                 ('Hit Rate',   lambda x: None),
                                 ('Calib',      lambda x: get_calibrated_data_status(x)),
                                 ('VDS',        lambda x: get_vds_file_status(x['run_number'])),
-                                ('Events',     lambda x: get_events_file_status(x['run_number'])),
+                                ('Events',     lambda x: get_events_file_status(x['run_number'], jobs)),
                                 ('Comments',   lambda x: None)])
         self.headings = headings
         

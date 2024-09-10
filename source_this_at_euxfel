@@ -4,6 +4,6 @@ source /etc/profile.d/modules.sh
 module load exfel exfel-python 
 
 # set experiment directory and number for bash and python scripts
-export EXP_ID=7076
+export EXP_ID=007076
 export EXP_PREFIX=/gpfs/exfel/exp/SPB/202421/p007076/
 

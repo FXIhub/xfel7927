@@ -3,14 +3,14 @@
 # call: sbatch submit_vds.sh <run_no>
 # eg:   sbatch submit_vds.sh 2
 
-#SBATCH --array=
+#SBATCH --array=${1}
 #SBATCH --time=01:00:00
 #SBATCH --export=ALL
-#SBATCH -J vds
-#SBATCH -o .vds-%4a-%j.out
-#SBATCH -e .vds-%4a-%j.out
+#SBATCH -J vds-${EXP_ID}-%4a-%j
+#SBATCH -o .vds-${EXP_ID}-%4a-%j.out
+#SBATCH -e .vds-${EXP_ID}-%4a-%j.out
 ###SBATCH --partition=upex-beamtime
-###SBATCH --reservation=upex_007927
+###SBATCH --reservation=upex_${EXP_ID}
 #SBATCH --partition=upex
 
 source /etc/profile.d/modules.sh
