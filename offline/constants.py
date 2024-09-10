@@ -3,23 +3,23 @@
 import os
 
 #PREFIX = '/gpfs/exfel/exp/SQS/202302/p004098/scratch/'
-PREFIX = os.environ("EXP_PREFIX")
+PREFIX = os.environ["EXP_PREFIX"]
 
 VDS_DATASET      = '/entry_1/instrument_1/detector_1/data'
 VDS_MASK_DATASET = '/entry_1/instrument_1/detector_1/mask'
 
 NMODULES = 16
-BAD_CELLIDS = [810]
+BAD_CELLIDS = []
 DET_NAME = 'SPB_DET_AGIPD1M-1'
+CHUNK_SIZE = 1
+MODULE_SHAPE = (512, 128)
 
 
 """
-MODULE_SHAPE = (512, 128)
 NPULSES = 585
 NCELLS = 800
 #NPULSES = 400
 #NCELLS = 400
-CHUNK_SIZE = 1
 #BAD_CELLIDS = list(range(0,17,2)) + list(range(484,499)) + [810]
 ADU_PER_PHOTON = 5.
 

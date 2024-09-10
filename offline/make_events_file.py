@@ -6,17 +6,16 @@ add cellID, pulseID, trainID, detector distance to an events file, eg events/eve
 import os
 import argparse
 
-PREFIX = os.environ("EXP_PREFIX")
+PREFIX = os.environ["EXP_PREFIX"]
 
 parser = argparse.ArgumentParser(description='Lit pixel calculator')
 parser.add_argument('run', type=int, help='Run number')
-parser.add_argument('-d', '--dark_run', type=int, help='Dark run number', default=-1)
 parser.add_argument('-n', '--nproc', 
                     help='Number of processes to use',
                     type=int, default=0)
 parser.add_argument('-o', '--out_folder', 
-                    help='Path of output folder (default=%s/events/)'%PREFIX,
-                    default=PREFIX+'/events/')
+                    help='Path of output folder (default=%s/scratch/events/)'%PREFIX,
+                    default=PREFIX+'/scratch/events/')
 args = parser.parse_args()
 
 import sys
@@ -30,10 +29,8 @@ import h5py
 import numpy as np
 
 import utils
-from constants import VDS_DATASET, NMODULES, CHUNK_SIZE
+from constants import VDS_DATASET, VDS_MASK_DATASET, NMODULES, CHUNK_SIZE, BAD_CELLIDS
 
-print(f'reading data from {vds_file}')
-print(f'output file       {out_fname}')
 
 
 class LitPixels():
@@ -62,7 +59,7 @@ class LitPixels():
         intens = mp.Array(ctypes.c_ulong, self.dshape[0])
         
         # powder for each module 
-        powder = mp.Array(ctypes.c_ulong, self.dshape[1:])
+        powder = mp.Array(ctypes.c_ulong, int(np.prod(self.dshape[2:])))
         
         jobs = []
         for c in range(self.nproc):
@@ -75,10 +72,10 @@ class LitPixels():
         
         self.litpix = np.frombuffer(litpix.get_obj(), dtype='u8')
         self.intens = np.frombuffer(intens.get_obj(), dtype='u8')
-        self.powder = np.frombuffer(intens.get_obj(), dtype='u8')
+        self.powder = np.frombuffer(powder.get_obj(), dtype='u8').reshape(self.dshape[2:])
         return self.litpix, self.intens, self.powder
     
-    def _part_worker(self, p, m, litpix, intens, self.powder):
+    def _part_worker(self, p, m, litpix, intens, powder):
         np_litpix = np.frombuffer(litpix.get_obj(), dtype='u8')
         np_intens = np.frombuffer(intens.get_obj(), dtype='u8')
         np_powder = np.frombuffer(powder.get_obj(), dtype='u8')
@@ -109,7 +106,9 @@ class LitPixels():
             
             np_litpix[pmin:pmax] = np.sum(vals>0, axis = (1,2))
             np_intens[pmin:pmax] = np.sum(vals, axis = (1,2))
-            np_powder           += vals
+            t = np.sum(vals, axis=0, dtype=np_powder.dtype).ravel()
+            #print(np_powder.dtype, np_powder.shape, vals.dtype, vals.shape, t.dtype, t.shape)
+            np_powder           += t
             
             etime = time.time()
             if p == 0:
@@ -120,9 +119,19 @@ class LitPixels():
             sys.stdout.write('\n')
             sys.stdout.flush()
 
-vds_file  = PREFIX+'vds/r%.4d.cxi' %args.run
+vds_file  = PREFIX+'scratch/vds/r%.4d.cxi' %args.run
 out_fname = args.out_folder + os.path.splitext(os.path.basename(vds_file))[0] + '_events.h5'
 modules   = range(NMODULES)
+
+print(f'reading data from {vds_file}')
+print(f'output file       {out_fname}')
+
+# check that vds file exists
+assert(os.path.exists(vds_file))
+
+# check that vds file points to corrected data
+result = subprocess.run(['h5ls', '-rv', vds_file], stdout=subprocess.PIPE)
+assert('CORR' in result.stdout.decode('utf-8'))
 
 print('Calculating lit pixels from', vds_file)
 l = LitPixels(vds_file, nproc=args.nproc)
@@ -134,15 +143,15 @@ litpixels = []
 photon_counts = []
 powder = []
 for module in modules:
-    l, c, p = l.run_module(module)
-    litpixels.append(l.copy())
-    photon_counts.append(c.copy())
-    powder.append(p.copy())
+    lit, counts, powd = l.run_module(module)
+    litpixels.append(lit.copy())
+    photon_counts.append(counts.copy())
+    powder.append(powd.copy())
 
 # get train, cell and pulse ID for each frame
 print('Copying IDs from VDS file')
 sys.stdout.flush()
-with h5py.File(vds_fname, 'r') as f_vds:
+with h5py.File(vds_file, 'r') as f_vds:
     trainId = f_vds['entry_1/trainId'][:]
     cellId  = f_vds['entry_1/cellId'][:]
     pulseId = f_vds['entry_1/pulseId'][:]
