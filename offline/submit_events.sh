@@ -12,7 +12,7 @@ sbatch <<EOT
 #SBATCH --array=${1}
 #SBATCH --time=01:00:00
 #SBATCH --export=ALL
-#SBATCH -J events-${EXP_ID}-${1}
+#SBATCH -J events-${EXP_ID}-${a}
 #SBATCH -o .events-${EXP_ID}-%4a-%j.out
 #SBATCH -e .events-${EXP_ID}-%4a-%j.out
 ###SBATCH --partition=upex-beamtime
@@ -22,14 +22,12 @@ sbatch <<EOT
 source /etc/profile.d/modules.sh
 source ../source_this_at_euxfel
 
-python make_events_file.py ${1} -n 32
-EOT
+run=${SLURM_ARRAY_TASK_ID}
+python make_events_file.py ${run} -n 32
 
 # add pulse energy
-python add_pulsedata.py ${1} -f
-
-# add wavelength
-#python add_wavelength.py ${1}
+python add_pulsedata.py ${run}
 
 # add is_hit
-#python add_is_hit.py ${1}
+python add_is_hit.py ${run}
+EOT

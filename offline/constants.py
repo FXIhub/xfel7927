@@ -9,7 +9,7 @@ VDS_DATASET      = '/entry_1/instrument_1/detector_1/data'
 VDS_MASK_DATASET = '/entry_1/instrument_1/detector_1/mask'
 
 NMODULES = 16
-BAD_CELLIDS = []
+BAD_CELLIDS = [351]
 DET_NAME = 'SPB_DET_AGIPD1M-1'
 CHUNK_SIZE = 1
 MODULE_SHAPE = (512, 128)
