@@ -168,14 +168,14 @@ with h5py.File(vds_file, 'r') as f_vds:
     pulseId = f_vds['entry_1/pulseId'][:]
 
 with h5py.File(out_fname, 'a') as f:
-    utils.update_h5(f, 'total_intens', np.array(photon_counts))
-    utils.update_h5(f, 'litpixels', np.array(litpixels))
-    utils.update_h5(f, 'trainId', trainId)
-    utils.update_h5(f, 'cellId', cellId)
-    utils.update_h5(f, 'pulseId', pulseId)
+    utils.update_h5(f, 'total_intens', np.array(photon_counts), compression=True)
+    utils.update_h5(f, 'litpixels', np.array(litpixels), compression=True)
+    utils.update_h5(f, 'trainId', trainId, compression=True)
+    utils.update_h5(f, 'cellId', cellId, compression=True)
+    utils.update_h5(f, 'pulseId', pulseId, compression=True)
 
 with h5py.File(powder_fname, 'a') as f:
-    utils.update_h5(f, 'powder', np.array(powder))
+    utils.update_h5(f, 'powder', np.array(powder), compression=True)
     
 print('DONE')
                 
