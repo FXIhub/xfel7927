@@ -12,10 +12,7 @@ import fnmatch
 import h5py
 import subprocess
 
-from constants import NPULSES_DATASET, NPULSES_DA_NUM
-
-PREFIX = os.environ['EXP_PREFIX']
-EXP_ID = os.environ['EXP_ID']
+from constants import NPULSES_DATASET, NPULSES_DA_NUM, PREFIX, EXP_ID
 
 hostname = socket.gethostname()
 running_on_maxwell = 'desy' in hostname
@@ -83,7 +80,7 @@ def get_events_file_status(run, jobs):
             out = 'ready'
         else :
             out = 'not ready'
-
+        
         if jobs :
             s = f'*events*{EXP_ID}*-{run}"'
             match = fnmatch.filter(jobs, s)
@@ -125,7 +122,7 @@ class Run_table():
     Call the EuXFEL metadata catalog to get run info
     This table can then be written to file or sent to a google sheet
     """
-
+    
     def __init__(self, proposal_number, credentials = 'credentials_mdc.json'):
         # communication object for requests to the mdc api
         self.comm = authenticate_mdc.get(credentials)
@@ -138,15 +135,12 @@ class Run_table():
         samples = self.comm.get_all_samples_by_proposal_id_api(self.proposal_id)
         self.sample_names = {s['id']: s['name'] for s in samples.json()}
 
-        # get run type  by id for later
+        # get run type by id for later
         experiments = self.comm.get_all_experiments_by_proposal_id_api(self.proposal_id)
         self.run_types = {s['id']: s['name'] for s in experiments.json()}
-
+        
         # get running jobs on maxwell
-        jobs = None
-        if running_on_maxwell :
-            jobs = subprocess.run(['squeue', '--format="%.30j"'], stdout=subprocess.PIPE)
-            jobs = jobs.stdout.decode('utf-8').split('\n')
+        self.
         
         # heading run_stats maping
         headings = OrderedDict([('Run number', lambda x: x['run_number']),
@@ -165,6 +159,13 @@ class Run_table():
                                 ('Events',     lambda x: get_events_file_status(x['run_number'], jobs)),
                                 ('Comments',   lambda x: None)])
         self.headings = headings
+
+    def get_slurm_jobs(self):
+        jobs = None
+        if running_on_maxwell :
+            jobs = subprocess.run(['squeue', '--format="%.30j"'], stdout=subprocess.PIPE)
+            jobs = jobs.stdout.decode('utf-8').split('\n')
+        return jobs
         
     def update(self): 
         # dictionary

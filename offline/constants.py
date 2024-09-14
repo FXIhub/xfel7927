@@ -4,6 +4,7 @@ import os
 
 #PREFIX = '/gpfs/exfel/exp/SQS/202302/p004098/scratch/'
 PREFIX = os.environ["EXP_PREFIX"]
+EXP_ID = os.environ["EXP_ID"]
 
 VDS_DATASET      = '/entry_1/instrument_1/detector_1/data'
 VDS_MASK_DATASET = '/entry_1/instrument_1/detector_1/mask'
@@ -15,6 +16,10 @@ DET_DIST = 700e-3
 CHUNK_SIZE = 1
 MODULE_SHAPE = (512, 128)
 FRAME_SHAPE = (NMODULES,) + MODULE_SHAPE
+
+# saturation level in photons ~100 from Oleksandr
+# look into this, looks like 150 is the gain switch level
+SATURATION = 150
 
 NPULSES_DA_NUM  = 2
 NPULSES_DATASET = '/RUN/SPB_IRU_AGIPD1M1/MDL/DATA_SELECTOR/spbIruAgipd1M1MdlFpgaComp/bunchStructure_nPulses/value'
