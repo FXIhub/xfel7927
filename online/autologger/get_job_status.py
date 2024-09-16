@@ -20,9 +20,9 @@ from constants import PREFIX, EXP_ID
 
 # job_name --> files to check
 # run = zero padded run name
-job_files = {'vds'   : ['{PREFIX}/scratch/vds/rrun.cxi'], 
-             'events': ['{PREFIX}/scratch/events/rrun_events.h5', '{PREFIX}/scratch/powder/rrun_powder.h5'], 
-             'cxi'   : ['{PREFIX}/scratch/cxi/rrun_hits.cxi', '{PREFIX}/scratch/emc/rrun.emc']}
+job_files = {'vds'   : [f'{PREFIX}/scratch/vds/rrun.cxi'], 
+             'events': [f'{PREFIX}/scratch/events/rrun_events.h5', f'{PREFIX}/scratch/powder/rrun_powder.h5'], 
+             'cxi'   : [f'{PREFIX}/scratch/cxi/rrun_hits.cxi', f'{PREFIX}/scratch/emc/rrun.emc']}
 
 
 class SLURM_status():
@@ -32,7 +32,7 @@ class SLURM_status():
         
     def update_slurm(self):
         t = time.time()
-        if self.last_updated is None or (t-self.last_updated).seconds < self.update_every :
+        if self.last_updated is None or (t-self.last_updated) < self.update_every :
             jobs = subprocess.run(['squeue', '--format="%.30j"'], stdout=subprocess.PIPE)
             jobs = jobs.stdout.decode('utf-8').split('\n')
             self.slurm_jobs = jobs
@@ -59,7 +59,7 @@ class LOG_status():
         log_files  = glob.glob(f'{self.log_dir}/{job_name}-{EXP_ID}-*-{run}')
         log_files.sort(key = os.path.getmtime, reverse = True)
         
-        is_log_file = len(log_file) > 0 
+        is_log_file = len(log_files) > 0 
         log_success = False
         if is_log_file :
             log_file = log_file[0]
@@ -83,6 +83,8 @@ class FILE_status():
             s = file.replace('run', f'{run:04}')
             if not os.path.exists(s) :
                 file_status = False
+
+            #print(s, file_status)
         return file_status
         
 

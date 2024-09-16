@@ -69,28 +69,6 @@ def get_vds_file_status(run):
     return out
 
 
-def get_events_file_status(run, jobs):
-    """
-    check for the existance of the file, e.g:
-        ${PREFIX}/scratch/events/events_r0034.h5
-    """
-    fnam = f'{PREFIX}/scratch/events/events_r{run:04}.h5'
-    out = None
-    if running_on_maxwell :
-        if os.path.exists(fnam):
-            out = 'ready'
-        else :
-            out = 'not ready'
-        
-        if jobs :
-            s = f'*events*{EXP_ID}*-{run}"'
-            match = fnmatch.filter(jobs, s)
-            print(run, s, match)
-            if len(match) > 0:
-                out = 'running'
-    return out
-    
-
 def get_num_pulses(run):
     npulses = None
     if running_on_maxwell :
@@ -107,11 +85,11 @@ def get_num_hits(run):
     hits = None
     if running_on_maxwell :
         fnam = PREFIX + '/scratch/events/r%.4d_events.h5' % run
-        print(fnam, os.path.exists(fnam))
         if os.path.exists(fnam) :
+            print('get_num_hits:', fnam, os.path.exists(fnam))
             with h5py.File(fnam) as f:
                 if 'is_hit' in f :
-                    hits = np.sum(f['is_hit'][()])
+                    hits = int(np.sum(f['is_hit'][()]))
                     print('hits = ', hits)
     return hits
     
@@ -148,7 +126,7 @@ def get_events_file_status(run, slurm_status, log_status, file_status):
             else :
                 out = ''
     
-    print(job_name, run, is_running, is_log_file, files_ok)
+    print(job_name, run, is_running, is_log_file, files_ok, 'out', out)
     return out
 
 def get_cxi_file_status(run, slurm_status, log_status, file_status):
@@ -183,7 +161,7 @@ def get_cxi_file_status(run, slurm_status, log_status, file_status):
             else :
                 out = ''
     
-    print(job_name, run, is_running, is_log_file, files_ok) 
+    #print(job_name, run, is_running, is_log_file, files_ok) 
     return out
 
 
@@ -242,7 +220,7 @@ class Run_table():
         # dictionary
         msg = MetadataClient.get_proposal_runs(self.comm, self.proposal_number)
 
-        print(msg.keys())
+        #print(msg.keys())
         
         assert(msg['success'] == True)
         

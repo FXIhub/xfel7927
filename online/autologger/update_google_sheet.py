@@ -1,6 +1,9 @@
 import authenticate_google
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+import json
+import numpy as np
+
 
 # help: https://developers.google.com/sheets/api/samples/writing
 # https://developers.google.com/sheets/api/guides/values#python
@@ -27,8 +30,12 @@ def batch_update_values(spreadsheet_id, sheet_id, headings, values, col_start = 
         col = []
         for c in r:
             col.append({"userEnteredValue": ({"numberValue": c} if str(c).replace('.', '', 1).isdigit() else {"stringValue": c})})
+            #col.append({"userEnteredValue": ({"stringValue": str(c)})})
         rows.append({"values": col})
     
+    # https://stackoverflow.com/questions/50916422/python-typeerror-object-of-type-int64-is-not-json-serializable
+    #rows = json.dumps(rows, cls=NpEncoder)
+
     body = {
     "requests": [
         {
@@ -45,7 +52,9 @@ def batch_update_values(spreadsheet_id, sheet_id, headings, values, col_start = 
     ]
     }
     
-    try:
+    
+    #try:
+    if True:
         service = build("sheets", "v4", credentials=creds)
         
         result = (
@@ -57,7 +66,7 @@ def batch_update_values(spreadsheet_id, sheet_id, headings, values, col_start = 
         print(f"{(result.get('totalUpdatedCells'))} cells updated.")
         return result
     
-    except HttpError as error:
-        print(f"An error occurred: {error}")
-        return error
+    #except HttpError as error:
+    #    print(f"An error occurred: {error}")
+    #    return error
 
