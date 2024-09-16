@@ -248,7 +248,7 @@ class Run_table():
         # run_dict[run_number] = {'VDS': 'ready', ...}
         run_dict = OrderedDict()
         for row in run_table:
-            run_number = row[0]
+            run_number = int(row[0])
             run_dict[run_number] = OrderedDict()
             for r, h in zip(row, self.headings.keys()):
                 run_dict[run_number][h] = r
