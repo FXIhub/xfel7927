@@ -243,6 +243,20 @@ class Run_table():
                 #    print(e)
             
             run_table.append(row)
+
+        # make run dict for log
+        # run_dict[run_number] = {'VDS': 'ready', ...}
+        run_dict = OrderedDict()
+        for row in run_table:
+            run_number = row[0]
+            run_dict[run_number] = OrderedDict()
+            for r, h in zip(row, self.headings.keys()):
+                run_dict[run_number][h] = r
+            
+        # save run table, json or pickle?
+        run_log = f'{PREFIX}/scratch/log/run_table.json'
+        with open(run_log, 'w') as f:
+            json.dump(run_dict, f, indent=4)
         
         return [h for h in self.headings], run_table
 
