@@ -13,6 +13,7 @@ import h5py
 import subprocess
 
 from constants import NPULSES_DATASET, NPULSES_DA_NUM, PREFIX, EXP_ID
+import get_job_status
 
 hostname = socket.gethostname()
 running_on_maxwell = 'desy' in hostname
@@ -111,10 +112,79 @@ def get_num_hits(run):
             with h5py.File(fnam) as f:
                 if 'is_hit' in f :
                     hits = np.sum(f['is_hit'][()])
-                    print(hits)
+                    print('hits = ', hits)
     return hits
     
 
+def get_events_file_status(run, slurm_status, log_status, file_status):
+    job_name = 'events'
+
+    if not running_on_maxwell :
+        return None
+        
+    # check if it is running
+    is_running = slurm_status.is_running(job_name, run)
+    
+    if is_running :
+        out = 'running'
+    else :
+        # check logs
+        is_log_file, log_success = log_status.check_log(job_name, run)
+        
+        # check files
+        files_ok = file_status.check_files(job_name, run)
+        
+        if is_log_file :
+            if file_ok :
+                out = 'ready'
+            # there is log file, it's not running, but no success line
+            else :
+                out = 'error'
+        else :
+            # log files were deleted or lost
+            if files_ok :
+                out = 'ready'
+            # no job was submitted
+            else :
+                out = ''
+    
+    print(job_name, run, is_running, is_log_file, files_ok)
+    return out
+
+def get_cxi_file_status(run, slurm_status, log_status, file_status):
+    job_name = 'cxi'
+
+    if not running_on_maxwell :
+        return None
+        
+    # check if it is running
+    is_running = slurm_status.is_running(job_name, run)
+    
+    if is_running :
+        out = 'running'
+    else :
+        # check logs
+        is_log_file, log_success = log_status.check_log(job_name, run)
+        
+        # check files
+        files_ok = file_status.check_files(job_name, run)
+        
+        if is_log_file :
+            if file_ok :
+                out = 'ready'
+            # there is log file, it's not running, but no success line
+            else :
+                out = 'error'
+        else :
+            # log files were deleted or lost
+            if files_ok :
+                out = 'ready'
+            # no job was submitted
+            else :
+                out = ''
+    
+    print(job_name, run, is_running, is_log_file, files_ok) 
+    return out
 
 
 class Run_table():
@@ -140,7 +210,13 @@ class Run_table():
         self.run_types = {s['id']: s['name'] for s in experiments.json()}
         
         # get running jobs on maxwell
-        self.
+        self.slurm_status = get_job_status.SLURM_status()
+        
+        # check log files
+        self.log_status = get_job_status.LOG_status()
+        
+        # check files
+        self.file_status = get_job_status.FILE_status()
         
         # heading run_stats maping
         headings = OrderedDict([('Run number', lambda x: x['run_number']),
@@ -156,21 +232,16 @@ class Run_table():
                                 ('Hit Rate',   lambda x: None),
                                 ('Calib',      lambda x: get_calibrated_data_status(x)),
                                 ('VDS',        lambda x: get_vds_file_status(x['run_number'])),
-                                ('Events',     lambda x: get_events_file_status(x['run_number'], jobs)),
+                                ('Events',     lambda x: get_events_file_status(x['run_number'], self.slurm_status, self.log_status, self.file_status)),
+                                ('CXI',        lambda x: get_cxi_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
+                                ('EMC files',  lambda x: get_cxi_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('Comments',   lambda x: None)])
         self.headings = headings
 
-    def get_slurm_jobs(self):
-        jobs = None
-        if running_on_maxwell :
-            jobs = subprocess.run(['squeue', '--format="%.30j"'], stdout=subprocess.PIPE)
-            jobs = jobs.stdout.decode('utf-8').split('\n')
-        return jobs
-        
     def update(self): 
         # dictionary
         msg = MetadataClient.get_proposal_runs(self.comm, self.proposal_number)
-        
+
         print(msg.keys())
         
         assert(msg['success'] == True)
