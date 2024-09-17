@@ -20,7 +20,7 @@ parser.add_argument('--out_folder_powder',
                     help='Path of output folder (default=%s/scratch/powder/)'%PREFIX,
                     default=PREFIX+'/scratch/powder/')
 parser.add_argument('-m', '--masks', 
-                    help=f'pixel masks to apply before calculating litpixels and photon counts located in {PREFIX}scratch/det/. Mask must be 1 for good and 0 for bad, and the data must be in /entry_1/good_pixels)'%PREFIX,
+                    help=f'pixel masks to apply before calculating litpixels and photon counts located in {PREFIX}scratch/det/. Mask must be 1 for good and 0 for bad, and the data must be in /entry_1/good_pixels)',
                     type=str, nargs='+',
                     default=['r0040_good_pixels.h5', 'hit_finding_mask.h5'] )
 args = parser.parse_args()
