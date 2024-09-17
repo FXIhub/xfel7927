@@ -11,7 +11,7 @@ import signal
 import skimage.measure
 import skimage.segmentation
 
-from constants import PREFIX
+#from constants import PREFIX
 
 # for (much faster) local viewing
 PREFIX='/home/andyofmelbourne/Documents/2024/p7076'
