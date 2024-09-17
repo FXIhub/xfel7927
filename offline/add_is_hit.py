@@ -6,10 +6,10 @@ parser.add_argument('run', type=int, help='Run number')
 parser.add_argument('-t', '--hit_score_threshold_sigma',
                     help='sigma threshold for hitscore to determine is_hit',
                     type=float, default=3)
-parser.add_argument('-m', '--modules',
-                    nargs='+',
-                    help='modules to include in hitscore calculation',
-                    type=int, default=[4,])
+#parser.add_argument('-m', '--modules',
+#                    nargs='+',
+#                    help='modules to include in hitscore calculation',
+#                    type=int, default=[4,])
 args = parser.parse_args()
 
 import utils
@@ -23,7 +23,7 @@ events_fnam = f'{PREFIX}/scratch/events/r{args.run:>04}_events.h5'
 # get hitscores
 # use integrated photon counts
 with h5py.File(events_fnam) as f:
-    hitscore = np.sum(f['total_intens'][:, args.modules], axis=1)
+    hitscore = np.sum(f['total_intens'][:], axis=1)
 
 # Get hit indices
 def gaussian(x, a, x0, sigma):
