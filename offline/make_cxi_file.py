@@ -7,12 +7,15 @@ parser.add_argument('run', type=int, help='Run number')
 parser.add_argument('-s', '--sample_name',
                     help='name of sample',
                     type=str, default='DNA Pointer')
+parser.add_argument('-m', '--mask', type=str, help=f'filename of global good pixels mask, located in {PREFIX}/scratch/det/')
 
 args = parser.parse_args()
     
-args.output_file      = PREFIX+'scratch/saved_hits/r%.4d_hits.cxi' %args.run
+args.output_file   = PREFIX+'scratch/saved_hits/r%.4d_hits.cxi' %args.run
 args.vds_file      = PREFIX+'scratch/vds/r%.4d.cxi' %args.run
 args.events_file   = PREFIX+'scratch/events/r%.4d_events.h5'%args.run
+if args.mask_file :
+    args.mask_file     = f'{PREFIX}scratch/det/{args.mask}'
 args.geom_file     = common.get_geom(args.run)
 args.z             = DET_DIST
 
@@ -37,6 +40,12 @@ y_pixel_size = 200e-6
 pixel_area   = x_pixel_size * y_pixel_size
 xyz[2] = args.z
 
+# get mask
+if args.mask :
+    with h5py.File(args.mask) as f:
+        good_pixels = f['entry_1/good_pixels'][()]
+else :
+    good_pixels = np.ones(xyz.shape[1:], dtype=bool)
 
 """
 h5ls r0035_events.h5
@@ -65,8 +74,8 @@ with h5py.File(args.events_file) as f:
     trainId_lit   = f['trainId'][()]
     pulseId_lit   = f['pulseId'][()]
 
-    photons      = np.sum(f['total_intens'][()], axis=1)
-    litpixels    = np.sum(f['litpixels'][()], axis=1)
+    photons      = f['total_intens'][()]
+    litpixels    = f['litpixels'][()]
     pulse_energy = f['pulse_energy'][()]
     wavelength   = f['wavelength'][()]
 
@@ -95,6 +104,7 @@ sys.stdout.flush()
 #       detector_1/
 #           data 
 #           mask 
+#           good_pixels 
 #           xyz_map 
 #           x_pixel_size 
 #           y_pixel_size 
@@ -160,6 +170,13 @@ with h5py.File(args.output_file, 'w') as f:
             shape=(Nevents,) + FRAME_SHAPE, 
             dtype=bool,
             chunks=(1,) + FRAME_SHAPE,
+            compression='gzip',
+            compression_opts=1,
+            shuffle=True)
+    
+    detector_1.create_dataset("good_pixels", 
+            data=good_pixels, 
+            chunks=FRAME_SHAPE,
             compression='gzip',
             compression_opts=1,
             shuffle=True)

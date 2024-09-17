@@ -276,7 +276,11 @@ class Run_table():
         run_dict['last_update'] = time.time()
             
         # save run table, json or pickle?
-        run_log = f'{PREFIX}/scratch/log/run_table.json'
+        if running_on_maxwell :
+            run_log = f'{PREFIX}/scratch/log/run_table.json'
+        else :
+            run_log = f'run_table.json'
+        
         with open(run_log, 'w') as f:
             json.dump(run_dict, f, indent=4)
         

@@ -19,7 +19,13 @@ parser.add_argument('-o', '--out_folder',
 parser.add_argument('--out_folder_powder', 
                     help='Path of output folder (default=%s/scratch/powder/)'%PREFIX,
                     default=PREFIX+'/scratch/powder/')
+parser.add_argument('-m', '--masks', 
+                    help=f'pixel masks to apply before calculating litpixels and photon counts located in {PREFIX}scratch/det/. Mask must be 1 for good and 0 for bad, and the data must be in /entry_1/good_pixels)'%PREFIX,
+                    type=str, nargs='+',
+                    default=['r0040_good_pixels.h5', 'hit_finding_mask.h5'] )
 args = parser.parse_args()
+
+args.masks = [f'{PREFIX}scratch/det/{f}' for f in args.masks]
 
 import sys
 import time
@@ -37,7 +43,7 @@ from constants import VDS_DATASET, VDS_MASK_DATASET, NMODULES, CHUNK_SIZE, BAD_C
 
 
 class LitPixels():
-    def __init__(self, vds_file, nproc=0, chunk_size=CHUNK_SIZE, total_intens=False):
+    def __init__(self, vds_file, mask, nproc=0, chunk_size=CHUNK_SIZE, total_intens=False):
         self.vds_file = vds_file
         self.chunk_size = chunk_size # Needs to be multiple of 32 for raw data
         if self.chunk_size % 32 != 0:
@@ -54,6 +60,7 @@ class LitPixels():
         # test
         #self.frames  = 32 * 1000
         
+        self.mask    = mask
         self.frames  = int(self.dshape[0])
         self.modules = int(self.dshape[1])
         self.pixels  = int(np.prod(self.dshape[2:]))
@@ -86,14 +93,14 @@ class LitPixels():
             sys.stdout.write(f'Done\n\n')
             sys.stdout.flush()
         
-        self.litpix = np.frombuffer(litpix.get_obj(), dtype='u8').reshape(self.frames, self.modules)
-        self.intens = np.frombuffer(intens.get_obj(), dtype='u8').reshape(self.frames, self.modules)
+        self.litpix = np.frombuffer(litpix.get_obj(), dtype='u8').reshape(self.frames)
+        self.intens = np.frombuffer(intens.get_obj(), dtype='u8').reshape(self.frames)
         self.powder = np.frombuffer(powder.get_obj(), dtype='u8').reshape(self.frame_shape)
         return self.litpix, self.intens, self.powder
     
     def _part_worker(self, p, litpix, intens, powder):
-        np_litpix = np.frombuffer(litpix.get_obj(), dtype='u8').reshape(self.frames, self.modules)
-        np_intens = np.frombuffer(intens.get_obj(), dtype='u8').reshape(self.frames, self.modules)
+        np_litpix = np.frombuffer(litpix.get_obj(), dtype='u8').reshape(self.frames)
+        np_intens = np.frombuffer(intens.get_obj(), dtype='u8').reshape(self.frames)
         np_powder = np.frombuffer(powder.get_obj(), dtype='u8').reshape(self.frame_shape)
         
         nframes = self.frames
@@ -119,12 +126,16 @@ class LitPixels():
             # mask bad cells and pixels
             vals[np.isin(cids, BAD_CELLIDS)] = 0
             vals *= mask
-            
-            np_litpix[pmin:pmax] = np.sum(vals>0, axis = (2,3))
-            np_intens[pmin:pmax] = np.sum(vals, axis = (2,3))
+
             t = np.sum(vals, axis=0, dtype=np_powder.dtype)
             #print(np_powder.dtype, np_powder.shape, vals.dtype, vals.shape, t.dtype, t.shape)
             np_powder           += t
+
+            # apply hitfinding mask
+            vals *= self.mask
+            
+            np_litpix[pmin:pmax] = np.sum(vals>0, axis = (1,2,3))
+            np_intens[pmin:pmax] = np.sum(vals, axis = (1,2,3))
             
             etime = time.time()
             if p == 0:
@@ -151,8 +162,20 @@ assert(os.path.exists(vds_file))
 result = subprocess.run(['h5ls', '-rv', vds_file], stdout=subprocess.PIPE)
 assert('CORR' in result.stdout.decode('utf-8'))
 
+print(f'loading masks {args.masks}')
+if len(args.masks) > 0 :
+    mask = None
+    for fnam in args.masks:
+        with h5py.File(fnam) as f:
+            if mask is None :
+                mask  = f['entry_1/good_pixels'][()]
+            else :
+                mask *= f['entry_1/good_pixels'][()]
+else :
+    mask = 1
+
 print('Calculating lit pixels from', vds_file)
-l = LitPixels(vds_file, nproc=args.nproc)
+l = LitPixels(vds_file, mask, nproc=args.nproc)
 
 print('Running on the following modules:', modules)
 
