@@ -11,6 +11,7 @@ import glob
 import fnmatch
 import h5py
 import subprocess
+import time
 
 from constants import NPULSES_DATASET, NPULSES_DA_NUM, PREFIX, EXP_ID
 import get_job_status
@@ -53,19 +54,40 @@ def get_calibrated_data_status(run_json):
             out = 'not running'
     return out
 
-def get_vds_file_status(run):
-    """
-    check for the existance of the file, e.g:
-        ${PREFIX}/scratch/vds/r0034.cxi
-    """
-    fnam = f'{PREFIX}/scratch/vds/r{run:04}.cxi'
-    if running_on_maxwell :
-        if os.path.exists(fnam):
-            out = 'ready'
-        else :
-            out = 'not ready'
+
+def get_vds_file_status(run, slurm_status, log_status, file_status):
+    job_name = 'vds'
+
+    if not running_on_maxwell :
+        return None
+        
+    # check if it is running
+    is_running = slurm_status.is_running(job_name, run)
+    
+    if is_running :
+        out = 'running'
     else :
-        out = None
+        # check logs
+        is_log_file, log_success = log_status.check_log(job_name, run)
+        
+        # check files
+        files_ok = file_status.check_files(job_name, run)
+        
+        if is_log_file :
+            if files_ok :
+                out = 'ready'
+            # there is log file, it's not running, but no success line
+            else :
+                out = 'error'
+        else :
+            # log files were deleted or lost
+            if files_ok :
+                out = 'ready'
+            # no job was submitted
+            else :
+                out = ''
+    
+    #print(job_name, run, is_running, is_log_file, files_ok) 
     return out
 
 
@@ -113,7 +135,7 @@ def get_events_file_status(run, slurm_status, log_status, file_status):
         files_ok = file_status.check_files(job_name, run)
         
         if is_log_file :
-            if file_ok :
+            if files_ok :
                 out = 'ready'
             # there is log file, it's not running, but no success line
             else :
@@ -126,7 +148,7 @@ def get_events_file_status(run, slurm_status, log_status, file_status):
             else :
                 out = ''
     
-    print(job_name, run, is_running, is_log_file, files_ok, 'out', out)
+    #print(job_name, run, is_running, is_log_file, files_ok, 'out', out)
     return out
 
 def get_cxi_file_status(run, slurm_status, log_status, file_status):
@@ -148,7 +170,7 @@ def get_cxi_file_status(run, slurm_status, log_status, file_status):
         files_ok = file_status.check_files(job_name, run)
         
         if is_log_file :
-            if file_ok :
+            if files_ok :
                 out = 'ready'
             # there is log file, it's not running, but no success line
             else :
@@ -209,7 +231,7 @@ class Run_table():
                                 ('Num Hits',   lambda x: get_num_hits(x['run_number'])),
                                 ('Hit Rate',   lambda x: None),
                                 ('Calib',      lambda x: get_calibrated_data_status(x)),
-                                ('VDS',        lambda x: get_vds_file_status(x['run_number'])),
+                                ('VDS',        lambda x: get_vds_file_status(x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('Events',     lambda x: get_events_file_status(x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('CXI',        lambda x: get_cxi_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('EMC files',  lambda x: get_cxi_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
@@ -219,7 +241,6 @@ class Run_table():
     def update(self): 
         # dictionary
         msg = MetadataClient.get_proposal_runs(self.comm, self.proposal_number)
-
         #print(msg.keys())
         
         assert(msg['success'] == True)
@@ -241,9 +262,8 @@ class Run_table():
                 #except Exception as e:
                 #    #print(run)
                 #    print(e)
-            
             run_table.append(row)
-
+        
         # make run dict for log
         # run_dict[run_number] = {'VDS': 'ready', ...}
         run_dict = OrderedDict()
@@ -252,6 +272,8 @@ class Run_table():
             run_dict[run_number] = OrderedDict()
             for r, h in zip(row, self.headings.keys()):
                 run_dict[run_number][h] = r
+        
+        run_dict['last_update'] = time.time()
             
         # save run table, json or pickle?
         run_log = f'{PREFIX}/scratch/log/run_table.json'

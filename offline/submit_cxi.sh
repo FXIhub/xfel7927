@@ -4,7 +4,12 @@
 # eg:   ./submit_events.sh 2 DNA
 
 source /etc/profile.d/modules.sh
-source ../source_this_at_euxfel
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+PARENT_DIR=$(dirname $SCRIPT_DIR)
+source $PARENT_DIR/source_this_at_euxfel
+
+cd $SCRIPT_DIR
 
 sbatch <<EOT
 #!/bin/bash
@@ -12,7 +17,7 @@ sbatch <<EOT
 #SBATCH --array=${1}
 #SBATCH --time=01:00:00
 #SBATCH --export=ALL
-#SBATCH -J cxi-${EXP_ID}-\${a}
+#SBATCH -J cxi-${EXP_ID}
 #SBATCH -o ${EXP_PREFIX}/scratch/log/cxi-${EXP_ID}-%A-%a.out
 #SBATCH -e ${EXP_PREFIX}/scratch/log/cxi-${EXP_ID}-%A-%a.out
 ###SBATCH --partition=upex-beamtime
@@ -23,7 +28,7 @@ sbatch <<EOT
 set -e
 
 source /etc/profile.d/modules.sh
-source ../source_this_at_euxfel
+source $PARENT_DIR/source_this_at_euxfel
 
 run=\${SLURM_ARRAY_TASK_ID}
 echo ${1} run = \${run}   sample = ${2}

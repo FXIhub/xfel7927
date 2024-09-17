@@ -4,9 +4,14 @@
 # eg:   sbatch submit_vds.sh 2
 
 source /etc/profile.d/modules.sh
-source ../source_this_at_euxfel
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+PARENT_DIR=$(dirname $SCRIPT_DIR)
+source $PARENT_DIR/source_this_at_euxfel
 
 sbatch <<EOT
+#!/bin/bash
+
 #SBATCH --array=${1}
 #SBATCH --time=01:00:00
 #SBATCH --export=ALL
@@ -17,14 +22,13 @@ sbatch <<EOT
 ###SBATCH --reservation=upex_${EXP_ID}
 #SBATCH --partition=upex
 
+set -e 
+
 source /etc/profile.d/modules.sh
-source ../source_this_at_euxfel
+source $PARENT_DIR/source_this_at_euxfel
 
-ID=${EXP_ID}
-PREFIX=${EXP_PREFIX}
-
-run=$(printf %.4d "\${SLURM_ARRAY_TASK_ID}")
-extra-data-make-virtual-cxi ${PREFIX}/raw/r\${run} -o ${PREFIX}/scratch/vds/r\${run}.cxi --exc-suspect-trains
+run=\$(printf %.4d "\${SLURM_ARRAY_TASK_ID}")
+extra-data-make-virtual-cxi ${EXP_PREFIX}/raw/r\${run} -o ${EXP_PREFIX}/scratch/vds/r\${run}.cxi --exc-suspect-trains
 
 echo vds done
 EOT

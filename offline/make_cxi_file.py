@@ -27,7 +27,7 @@ import scipy.constants as sc
 
 import multiprocessing as mp
 
-data_dtype = np.unit8
+data_dtype = np.uint8
 
 # get pixle maps
 geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(args.geom_file)
@@ -202,7 +202,7 @@ def worker(rank, lock):
             index = my_indices[i]
             
             frame_buf[i] = np.squeeze(data[index])
-            sat = frame_buf[i] => SATURATION
+            sat = frame_buf[i] >= SATURATION
             mask_buf[i]  = np.squeeze(mask[index] == 0)
             mask_buf[i, sat] = False
             
