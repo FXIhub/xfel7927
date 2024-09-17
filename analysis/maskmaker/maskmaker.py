@@ -229,8 +229,9 @@ class Application:
     def save_mask(self):
         print('saving good pixels to mask.h5/entry_1/good_pixels')
         with h5py.File('mask.h5', 'w') as f:
-            f['entry_1/good_pixels'] = self.mask.reshape(self.data_shape)
-            f['entry_1/bad_pixels'] = ~self.mask.reshape(self.data_shape)
+            f.create_dataset('entry_1/good_pixels', data = self.mask.reshape(self.data_shape), dtype=bool, compression='gzip')
+            #f['entry_1/good_pixels'] = self.mask.reshape(self.data_shape)
+            #f['entry_1/bad_pixels'] = ~self.mask.reshape(self.data_shape)
         print('Done!')
     
     def mask_ROI(self, roi):
