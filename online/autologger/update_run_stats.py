@@ -69,12 +69,13 @@ def get_vds_file_status(run, slurm_status, log_status, file_status):
     else :
         # check logs
         is_log_file, log_success = log_status.check_log(job_name, run)
+
         
         # check files
         files_ok = file_status.check_files(job_name, run)
         
         if is_log_file :
-            if files_ok :
+            if files_ok and log_success :
                 out = 'ready'
             # there is log file, it's not running, but no success line
             else :
@@ -130,14 +131,17 @@ def get_events_file_status(run, slurm_status, log_status, file_status):
     else :
         # check logs
         is_log_file, log_success = log_status.check_log(job_name, run)
+
+        if run == 37:
+            print('events status 37:', is_log_file, log_success)
         
         # check files
         files_ok = file_status.check_files(job_name, run)
         
         if is_log_file :
-            if files_ok :
+            if files_ok and log_success :
                 out = 'ready'
-            # there is log file, it's not running, but no success line
+            # there is log file, it's not running, but no success line or no file
             else :
                 out = 'error'
         else :
@@ -170,7 +174,7 @@ def get_cxi_file_status(run, slurm_status, log_status, file_status):
         files_ok = file_status.check_files(job_name, run)
         
         if is_log_file :
-            if files_ok :
+            if files_ok and log_success :
                 out = 'ready'
             # there is log file, it's not running, but no success line
             else :

@@ -46,9 +46,9 @@ class SLURM_status():
         # is job running?   
         match = fnmatch.filter(self.slurm_jobs, job_string)
         running = len(match) > 0
-        
-        if run == 53:
-            print('slurm', run, job_name, job_string, running)
+
+        if run == 37:
+            print('slurm', run, job_name, job_string, match, running)
         return running
 
 
@@ -70,8 +70,12 @@ class LOG_status():
              
             # has the job finished successfully?
             # check if log file exist and has "{job_name} done"     
-            cmd = subprocess.run(f'grep "{job_name} done" {log_file}', shell=True, text=True)
+            grp = f'grep "{job_name} done" {log_file}'
+            cmd = subprocess.run(grp, shell=True, text=True, stdout=subprocess.PIPE).stdout
             #log_success = len(cmd.stdout) > 0
+
+            if run == 37 :
+                print('Log status 37:', grp, cmd)
             if cmd :
                 log_success = True
         return is_log_file, log_success

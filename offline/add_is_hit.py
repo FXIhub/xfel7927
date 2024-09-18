@@ -23,13 +23,11 @@ events_fnam = f'{PREFIX}/scratch/events/r{args.run:>04}_events.h5'
 # get hitscores
 # use integrated photon counts
 with h5py.File(events_fnam) as f:
-    hitscore = np.sum(f['total_intens'][:], axis=1)
+    hitscore = f['litpixels'][:]
 
 # Get hit indices
 def gaussian(x, a, x0, sigma):
     return a * np.exp(-(x-x0)**2 / 2 / sigma**2)
-
-hit_score_threshold_sigma = 3
 
 offset = 100
 hy, hx = np.histogram(hitscore, np.arange(0, hitscore.max()+1, 1))
@@ -46,7 +44,7 @@ miss_thresh_max = popt[1] - np.abs(args.hit_score_threshold_sigma   * popt[2])
 miss_thresh_min = popt[1] - 3*np.abs(args.hit_score_threshold_sigma * popt[2])
 
 # thresholds for hit
-hit_thresh_min = popt[1] + np.abs(hit_score_threshold_sigma * popt[2])
+hit_thresh_min = popt[1] + np.abs(args.hit_score_threshold_sigma * popt[2])
 hit_thresh_max = np.inf
 
 print('Fitted background Gaussian to hit score: %.3f +- %.3f' % (popt[1], popt[2]))

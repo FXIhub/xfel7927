@@ -14,8 +14,10 @@ args = parser.parse_args()
 args.output_file   = PREFIX+'scratch/saved_hits/r%.4d_hits.cxi' %args.run
 args.vds_file      = PREFIX+'scratch/vds/r%.4d.cxi' %args.run
 args.events_file   = PREFIX+'scratch/events/r%.4d_events.h5'%args.run
-if args.mask_file :
+if args.mask :
     args.mask_file     = f'{PREFIX}scratch/det/{args.mask}'
+else:
+    args.mask_file     = None
 args.geom_file     = common.get_geom(args.run)
 args.z             = DET_DIST
 
@@ -41,8 +43,8 @@ pixel_area   = x_pixel_size * y_pixel_size
 xyz[2] = args.z
 
 # get mask
-if args.mask :
-    with h5py.File(args.mask) as f:
+if args.mask_file :
+    with h5py.File(args.mask_file) as f:
         good_pixels = f['entry_1/good_pixels'][()]
 else :
     good_pixels = np.ones(xyz.shape[1:], dtype=bool)
@@ -52,10 +54,10 @@ h5ls r0035_events.h5
 /cellId                  Dataset {1055808, 16}
 /is_hit                  Dataset {1055808}
 /is_miss                 Dataset {1055808}
-/litpixels               Dataset {1055808, 16}
+/litpixels               Dataset {1055808}
 /pulseId                 Dataset {1055808}
 /pulse_energy            Dataset {1055808}
-/total_intens            Dataset {1055808, 16}
+/total_intens            Dataset {1055808}
 /trainId                 Dataset {1055808}
 /wavelength              Dataset {1055808}
 """
@@ -221,7 +223,12 @@ def worker(rank, lock):
             frame_buf[i] = np.squeeze(data[index])
             sat = frame_buf[i] >= SATURATION
             mask_buf[i]  = np.squeeze(mask[index] == 0)
+              
+            # mask saturated pixels
             mask_buf[i, sat] = False
+              
+            # add global mask
+            mask_buf[i] *= good_pixels
             
             # make sure we have the right event
             assert(cellId_vds[index] == cellId_lit[index])

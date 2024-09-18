@@ -72,10 +72,10 @@ class LitPixels():
         sys.stdout.flush()
         
         # Litpixels for each module and each frame
-        litpix = mp.Array(ctypes.c_ulong, self.frames * self.modules)
+        litpix = mp.Array(ctypes.c_ulong, self.frames)
         
         # photon counts for each module and each frame
-        intens = mp.Array(ctypes.c_ulong, self.frames * self.modules)
+        intens = mp.Array(ctypes.c_ulong, self.frames)
         
         # powder for each module 
         powder = mp.Array(ctypes.c_ulong, self.modules * self.pixels)
