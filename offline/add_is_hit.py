@@ -39,9 +39,9 @@ sig = np.std(hitscore[m])
 
 popt, pcov = optimize.curve_fit(gaussian, hx[offset:xmax], hy[offset:xmax], p0=(hy.max(), xmax, sig))
 
-# thresholds for miss
-miss_thresh_max = popt[1] - np.abs(args.hit_score_threshold_sigma   * popt[2])
-miss_thresh_min = popt[1] - 3*np.abs(args.hit_score_threshold_sigma * popt[2])
+# thresholds for miss -3 to 0 sigma from mean
+miss_thresh_max = popt[1] 
+miss_thresh_min = popt[1] - 3*np.abs(popt[2])
 
 # thresholds for hit
 hit_thresh_min = popt[1] + np.abs(args.hit_score_threshold_sigma * popt[2])

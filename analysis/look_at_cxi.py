@@ -212,7 +212,7 @@ with h5py.File(args.cxi) as f:
     xyz = f['/entry_1/instrument_1/detector_1/xyz_map'][()]
 
     # also load powder
-    powder = f['/entry_1/instrument_1/detector_1/powder'][()]
+    powder = f['/entry_1/instrument_1/detector_1/background'][()]
 
 
 f = h5py.File(args.cxi)
