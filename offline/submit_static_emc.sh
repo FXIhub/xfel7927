@@ -34,7 +34,7 @@ cd static_emc
 
 run=\${SLURM_ARRAY_TASK_ID}
 
-./static_emc/static_emc.sh \${run}
+./static_emc.sh \${run}
 
 echo static_emc done
 EOT

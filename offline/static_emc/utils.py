@@ -188,8 +188,6 @@ def plot_all_classes(c, r, iteration = 0):
 
     plt.close(fig)
     
-    os.system(f"pdfunite {c.working_dir}/class_*.pdf {c.working_dir}/classes.pdf")
-    os.system(f"rm {c.working_dir}/class_*.pdf")
     
     
 
