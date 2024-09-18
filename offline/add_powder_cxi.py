@@ -42,8 +42,8 @@ def worker(rank, b):
     else :
         it = range(len(my_indices))
 
-    powder = np.zeros(FRAME_SHAPE, dtype=float)
-    overlap    = np.zeros(FRAME_SHAPE, dtype=int)
+    powder  = np.zeros(FRAME_SHAPE, dtype=float)
+    overlap = np.zeros(FRAME_SHAPE, dtype=int)
     
     with h5py.File(args.output_file) as g:
         data = g[VDS_DATASET]
@@ -53,7 +53,7 @@ def worker(rank, b):
             index = my_indices[i]
             
             frame = np.squeeze(data[index])
-            m     = np.squeeze(mask[index] == 0)
+            m     = np.squeeze(mask[index])
             
             powder     += frame * m
             overlap    += m
@@ -65,12 +65,12 @@ b = mp.Queue()
 jobs = [mp.Process(target=worker, args=(m, b)) for m in range(size)]
 [j.start() for j in jobs]
 
-powder_g = np.zeros(FRAME_SHAPE, dtype=float)
-overlap_g    = np.zeros(FRAME_SHAPE, dtype=int)
+powder_g  = np.zeros(FRAME_SHAPE, dtype=float)
+overlap_g = np.zeros(FRAME_SHAPE, dtype=int)
 for r in range(size):
     powder, overlap = b.get()
-    powder_g += powder
-    overlap_g    += overlap
+    powder_g  += powder
+    overlap_g += overlap
 [j.join() for j in jobs]
 
 out = powder_g / np.clip(overlap_g, 1, None)
