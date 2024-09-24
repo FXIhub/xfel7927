@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# call: sbatch submit_vds.sh <run_no>
-# eg:   sbatch submit_vds.sh 2
+# call: ./submit_vds.sh <run_no>
+# eg:   ./submit_vds.sh 2
 
 source /etc/profile.d/modules.sh
 
