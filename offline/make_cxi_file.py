@@ -129,6 +129,7 @@ with h5py.File(args.output_file, 'w') as f:
     entry_1['trainId']  = trainId_lit[indices]
     entry_1['cellId']   = cellId_lit[indices]
     entry_1['pulseId']  = pulseId_lit[indices]
+    entry_1['vds_index']  = indices
 
     # copy instrument name
     instrument_1 = entry_1.create_group("instrument_1")
@@ -168,13 +169,14 @@ with h5py.File(args.output_file, 'w') as f:
             compression_opts=1,
             shuffle=True)
 
-    detector_1.create_dataset("mask", 
-            shape=(Nevents,) + FRAME_SHAPE, 
-            dtype=bool,
-            chunks=(1,) + FRAME_SHAPE,
-            compression='gzip',
-            compression_opts=1,
-            shuffle=True)
+    # takes up too much space
+    #detector_1.create_dataset("mask", 
+    #        shape=(Nevents,) + FRAME_SHAPE, 
+    #        dtype=bool,
+    #        chunks=(1,) + FRAME_SHAPE,
+    #        compression='gzip',
+    #        compression_opts=1,
+    #        shuffle=True)
     
     detector_1.create_dataset("good_pixels", 
             data=good_pixels, 
@@ -185,7 +187,6 @@ with h5py.File(args.output_file, 'w') as f:
     
     # link /entry_1/data_1/data
     f["entry_1/data_1/data"] = h5py.SoftLink('/entry_1/instrument_1/detector_1/data')
-
 
 #size = mp.cpu_count()
 size = 16
@@ -204,14 +205,14 @@ def worker(rank, lock):
     
     print(f'rank {rank} is processing indices {events_rank[rank]} to {events_rank[rank+1]}')
     sys.stdout.flush()
-
+    
     if rank == 0 :
         it = tqdm(range(len(my_indices)), desc = f'Processing data from {args.vds_file}')
     else :
         it = range(len(my_indices))
-
+    
     frame_buf = np.empty((len(my_indices),) + FRAME_SHAPE, dtype=data_dtype)
-    mask_buf  = np.empty((len(my_indices),) + FRAME_SHAPE, dtype=bool)
+    #mask_buf  = np.empty((len(my_indices),) + FRAME_SHAPE, dtype=bool)
 
     with h5py.File(args.vds_file) as g:
         data = g[VDS_DATASET]
@@ -220,15 +221,16 @@ def worker(rank, lock):
         for i in it:
             index = my_indices[i]
             
-            frame_buf[i] = np.squeeze(data[index])
-            sat = frame_buf[i] >= SATURATION
-            mask_buf[i]  = np.squeeze(mask[index] == 0)
+            # apply per-pulse mask but not global mask
+            frame_buf[i] = np.squeeze(data[index] * mask[index])
+            #sat = frame_buf[i] >= SATURATION
+            #mask_buf[i]  = np.squeeze(mask[index] == 0)
               
             # mask saturated pixels
-            mask_buf[i, sat] = False
+            #mask_buf[i, sat] = False
               
             # add global mask
-            mask_buf[i] *= good_pixels
+            #mask_buf[i] *= good_pixels
             
             # make sure we have the right event
             assert(cellId_vds[index] == cellId_lit[index])
@@ -243,7 +245,7 @@ def worker(rank, lock):
         with h5py.File(args.output_file, 'a') as f:
             for i in it :
                 f['entry_1/instrument_1/detector_1/data'][events_rank[rank] + i] = frame_buf[i]
-                f['entry_1/instrument_1/detector_1/mask'][events_rank[rank] + i] = mask_buf[i]
+                #f['entry_1/instrument_1/detector_1/mask'][events_rank[rank] + i] = mask_buf[i]
         
         sys.stdout.flush()
         lock.release()
