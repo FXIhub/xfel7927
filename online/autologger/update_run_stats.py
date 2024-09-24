@@ -204,9 +204,11 @@ def get_static_emc_file_status(run, slurm_status, log_status, file_status):
     else :
         # check logs
         is_log_file, log_success = log_status.check_log(job_name, run)
-        
+
         # check files
         files_ok = file_status.check_files(job_name, run)
+
+        print('static emc', run, is_log_file, log_success, files_ok)
         
         if is_log_file :
             if files_ok and log_success :

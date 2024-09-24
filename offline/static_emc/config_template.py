@@ -28,9 +28,9 @@ def crop_to_nonzero_ND(ar):
     return ar[sl].copy(), sl
 
 
-classes            = 10
+classes            = 100
 background_classes = 1
-max_frames         = 100000000
+max_frames         = 100000
 frame_shape        = (16, 512, 128)
 #frame_slice        = np.s_[4, -128:, -128:]
 #imshow             = lambda x: x[frame_slice]
@@ -43,11 +43,11 @@ filter_value       = True
 
 tol_P = 1e-2
 
-iters = 10
+iters = 20
 update_b     = np.ones((iters,), dtype=bool)
 update_b[0]  = False
 update_B     = np.zeros((iters,), dtype=bool)
 beta_start   = 0.001
-beta_stop    = 0.001
-betas = (beta_stop / beta_start)**(np.arange(iters)/(5-1)) * beta_start
+beta_stop    = 0.1
+betas = (beta_stop / beta_start)**(np.arange(iters)/(iters-1)) * beta_start
 

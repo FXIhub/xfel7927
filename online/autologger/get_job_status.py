@@ -23,7 +23,7 @@ from constants import PREFIX, EXP_ID
 job_files = {'vds'   : [f'{PREFIX}/scratch/vds/rrun.cxi'], 
              'events': [f'{PREFIX}/scratch/events/rrun_events.h5', f'{PREFIX}/scratch/powder/rrun_powder.h5'], 
              'cxi'   : [f'{PREFIX}/scratch/saved_hits/rrun_hits.cxi', f'{PREFIX}/scratch/emc/rrun.emc'],
-             'static_emc' : [f'{PREFIX}/scratch/static_emc/recon.pdf']}
+             'static_emc' : [f'{PREFIX}/scratch/static_emc/rrun/recon.pdf']}
 
 
 class SLURM_status():
