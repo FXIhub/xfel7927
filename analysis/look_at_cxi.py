@@ -108,7 +108,7 @@ class Application(QtWidgets.QMainWindow):
                 self.frame_index = i
                 j = self.sorted_indices[self.frame_index]
                 
-                print(i, j, self.litpix[i], self.data.dtype)
+                print('sorted index', i, 'file index', j, 'litpixels', self.litpix[i], self.data.dtype)
                 
                 if self.frame_index >= 0 :
                     self.data[:] = np.squeeze(self.z_data[j] * self.z_mask[j])
@@ -199,14 +199,6 @@ args = parse_cmdline_args()
 args.run  = args.cxi
 args.cxi  = PREFIX+'/scratch/saved_hits/r%.4d_hits.cxi'%args.cxi
 
-if args.litpixels :
-    with h5py.File(args.cxi) as f:
-        litpixels = f['/entry_1/instrument_1/detector_1/lit_pixels'][()]
-        sorted_indices    = np.argsort(litpixels)[::-1]
-        litpix    = litpixels[sorted_indices]
-        sort = True
-else :
-    sort = False
 
 with h5py.File(args.cxi) as f:
     xyz = f['/entry_1/instrument_1/detector_1/xyz_map'][()]
@@ -217,6 +209,17 @@ with h5py.File(args.cxi) as f:
 
 f = h5py.File(args.cxi)
 data = f[DATA_PATH]
+
+if args.litpixels :
+    with h5py.File(args.cxi) as f:
+        litpixels = f['/entry_1/instrument_1/detector_1/lit_pixels'][()]
+        sorted_indices    = np.argsort(litpixels)[::-1]
+        litpix    = litpixels[sorted_indices]
+        sort = True
+else :
+    sorted_indices  = np.arange(data.shape[0])
+    litpix = np.zeros((data.shape[0],))
+    sort = False
 
 if args.apply_mask:
     mask = f[MASK_PATH]
