@@ -80,7 +80,8 @@ def init(c):
         if len(K) < c.max_frames :
             with h5py.File(fnam) as f:
                 data = f['entry_1/data_1/data']
-                mask_per_pattern = f['/entry_1/instrument_1/detector_1/mask']
+                # assume already applied
+                # mask_per_pattern = f['/entry_1/instrument_1/detector_1/mask']
                 D    = data.shape[0] 
                 
                 if c.filter_by is not None :
@@ -96,7 +97,7 @@ def init(c):
                 filter_count += D - len(ds)
                 for d in tqdm(ds, desc = f'loading data from {fnam}'):
                     # hack for per-pattern mask
-                    frame = data[d][mask].ravel() * mask_per_pattern[d][mask].ravel()
+                    frame = data[d][mask].ravel() #* mask_per_pattern[d][mask].ravel()
                     m = frame > 0 
                     if (np.sum(frame[m])) > 10 :
                         K.append(frame[m].copy())

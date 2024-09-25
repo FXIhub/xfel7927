@@ -38,9 +38,6 @@ python make_cxi_file.py \${run} -s ${2}
 # add background
 python add_background_cxi.py \${run}
 
-# add powder of hits
-python add_powder_cxi.py \${run}
-
 echo cxi done
 
 # write emc file
