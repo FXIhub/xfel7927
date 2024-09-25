@@ -28,7 +28,7 @@ source /etc/profile.d/modules.sh
 source $PARENT_DIR/source_this_at_euxfel
 
 run=\$(printf %.4d "\${SLURM_ARRAY_TASK_ID}")
-extra-data-make-virtual-cxi ${EXP_PREFIX}/raw/r\${run} -o ${EXP_PREFIX}/scratch/vds/r\${run}.cxi --exc-suspect-trains
+extra-data-make-virtual-cxi ${EXP_PREFIX}/proc/r\${run} -o ${EXP_PREFIX}/scratch/vds/r\${run}.cxi --exc-suspect-trains
 
 echo vds done
 EOT
