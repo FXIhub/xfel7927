@@ -169,21 +169,30 @@ with h5py.File(args.output_file, 'w') as f:
             compression_opts=1,
             shuffle=True)
 
-    # takes up too much space
-    #detector_1.create_dataset("mask", 
-    #        shape=(Nevents,) + FRAME_SHAPE, 
-    #        dtype=bool,
-    #        chunks=(1,) + FRAME_SHAPE,
-    #        compression='gzip',
-    #        compression_opts=1,
-    #        shuffle=True)
-    
+    detector_1.create_dataset("powder", 
+            shape=FRAME_SHAPE, 
+            dtype=np.uint64,
+            chunks=FRAME_SHAPE,
+            compression='gzip',
+            compression_opts=1,
+            shuffle=True)
+
+    detector_1.create_dataset("powder_overlap", 
+            shape=FRAME_SHAPE, 
+            dtype=np.uint64,
+            chunks=FRAME_SHAPE,
+            compression='gzip',
+            compression_opts=1,
+            shuffle=True,
+            fillvalue = 0)
+
     detector_1.create_dataset("good_pixels", 
             data=good_pixels, 
             chunks=FRAME_SHAPE,
             compression='gzip',
             compression_opts=1,
-            shuffle=True)
+            shuffle=True,
+            fillvalue = 0)
     
     # link /entry_1/data_1/data
     f["entry_1/data_1/data"] = h5py.SoftLink('/entry_1/instrument_1/detector_1/data')
@@ -210,9 +219,10 @@ def worker(rank, lock):
         it = tqdm(range(len(my_indices)), desc = f'Processing data from {args.vds_file}')
     else :
         it = range(len(my_indices))
+    powder    = np.zeros(FRAME_SHAPE, dtype = np.uint64)
+    overlap   = np.zeros(FRAME_SHAPE, dtype = np.uint64)
     
     frame_buf = np.empty((len(my_indices),) + FRAME_SHAPE, dtype=data_dtype)
-    #mask_buf  = np.empty((len(my_indices),) + FRAME_SHAPE, dtype=bool)
 
     with h5py.File(args.vds_file) as g:
         data = g[VDS_DATASET]
@@ -221,22 +231,20 @@ def worker(rank, lock):
         for i in it:
             index = my_indices[i]
             
-            # apply per-pulse mask but not global mask
-            frame_buf[i] = np.squeeze(data[index] * mask[index])
-            #sat = frame_buf[i] >= SATURATION
-            #mask_buf[i]  = np.squeeze(mask[index] == 0)
+            frame_buf[i] = np.squeeze(data[index])
+            mask         = np.squeeze(mask[index] == 0)
               
-            # mask saturated pixels
-            #mask_buf[i, sat] = False
-              
-            # add global mask
-            #mask_buf[i] *= good_pixels
+            # apply per-frame mask
+            frame_buf[i] *= mask
+
+            # add to powder
+            powder  += frame_buf[i]
+            overlap += mask
             
             # make sure we have the right event
             assert(cellId_vds[index] == cellId_lit[index])
             assert(trainId_vds[index] == trainId_lit[index])
             assert(pulseId_vds[index] == pulseId_lit[index])
-            
             
     # take turns writing frame_buf to file 
     it = tqdm(range(len(my_indices)), desc = f'rank {rank} writing data to {args.output_file}')
@@ -245,7 +253,15 @@ def worker(rank, lock):
         with h5py.File(args.output_file, 'a') as f:
             for i in it :
                 f['entry_1/instrument_1/detector_1/data'][events_rank[rank] + i] = frame_buf[i]
-                #f['entry_1/instrument_1/detector_1/mask'][events_rank[rank] + i] = mask_buf[i]
+            
+            # update powder
+            powder_file  = f['entry_1/instrument_1/detector_1/powder'][()]
+            powder_file += powder
+            f['entry_1/instrument_1/detector_1/powder'][:] = powder_file
+                
+            overlap_file  = f['entry_1/instrument_1/detector_1/powder_overlap'][()]
+            overlap_file += overlap
+            f['entry_1/instrument_1/detector_1/powder_overlap'][:] = overlap_file
         
         sys.stdout.flush()
         lock.release()
