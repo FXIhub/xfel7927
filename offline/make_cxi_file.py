@@ -232,14 +232,14 @@ def worker(rank, lock):
             index = my_indices[i]
             
             frame_buf[i] = np.squeeze(data[index])
-            mask         = np.squeeze(mask[index] == 0)
+            m            = np.squeeze(mask[index] == 0)
               
             # apply per-frame mask
-            frame_buf[i] *= mask
+            frame_buf[i] *= m   
 
             # add to powder
             powder  += frame_buf[i]
-            overlap += mask
+            overlap += m
             
             # make sure we have the right event
             assert(cellId_vds[index] == cellId_lit[index])
