@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 
 PREFIX = '/gpfs/exfel/exp/SPB/202421/p007076/scratch'
-Run_id = 36 # sys.args[1]
+Run_id =  sys.argv[1]
 
 
 
@@ -73,12 +73,16 @@ ave = r.make_rad_av(background)
 xaxis = np.linspace(min_rad,max_rad,ave.shape[0])
 ave_all_rings = np.sum(ave[5:-5])
 
-plt.figure()
+plt.figure(figsize=(10,10))
 plt.loglog(xaxis[5:],ave[5:])
 plt.xlabel('radius')
 plt.ylabel('background intensity')
-plt.title(f'ave of all radius: {ave_all_rings}')
-plt.savefig(f'{PREFIX}/background_plots/{Run_id}_background.pdf')
+plt.title(f'sum of all radius: {ave_all_rings}')
+plt.savefig(f'{PREFIX}/background_plots/_{Run_id}_background.pdf')
+
+
+with h5py.File(f'{PREFIX}/background_plots/_{Run_id}_background.h5','a') as file:
+    file.create_dataset("/entry_1/instrument_1/radial_average_background",data=ave)
 
 
 print('done')
