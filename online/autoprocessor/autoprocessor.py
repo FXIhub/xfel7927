@@ -17,6 +17,8 @@ def run_pipeline(sleep = 10):
         with open(fnam, 'r') as f:
             run_table = json.load(f)
         
+        print('last update:', (run_table['last_update'] - t),' seconds ago')
+        
         if (run_table['last_update'] - t) > 0 :
             for run in run_table:   
                 if run == 'last_update' : 
