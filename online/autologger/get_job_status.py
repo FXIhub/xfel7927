@@ -13,6 +13,7 @@ import subprocess
 import glob
 import os
 import time
+import h5py
 
 
 from constants import PREFIX, EXP_ID
@@ -20,9 +21,10 @@ from constants import PREFIX, EXP_ID
 
 # job_name --> files to check
 # run = zero padded run name
-job_files = {'vds'   : [f'{PREFIX}/scratch/vds/rrun.cxi'], 
-             'events': [f'{PREFIX}/scratch/events/rrun_events.h5', f'{PREFIX}/scratch/powder/rrun_powder.h5'], 
-             'cxi'   : [f'{PREFIX}/scratch/saved_hits/rrun_hits.cxi', f'{PREFIX}/scratch/emc/rrun.emc'],
+job_files = {'vds'    : [f'{PREFIX}/scratch/vds/rrun.cxi'], 
+             'events' : [f'{PREFIX}/scratch/events/rrun_events.h5', f'{PREFIX}/scratch/powder/rrun_powder.h5'], 
+             'cxi'    : [f'{PREFIX}/scratch/saved_hits/rrun_hits.cxi', f'{PREFIX}/scratch/emc/rrun.emc'],
+             'sizing' : [f'{PREFIX}/scratch/saved_hits/rrun_hits.cxi', f'{PREFIX}/scratch/events/rrun_events.h5'],
              'static_emc' : [f'{PREFIX}/scratch/static_emc/rrun/recon.pdf']}
 
 
@@ -92,9 +94,22 @@ class FILE_status():
         file_status = True
         for file in job_files[job_name]:
             s = file.replace('run', f'{run:04}')
+            
             if not os.path.exists(s) :
                 file_status = False
+            
+            elif job_name == 'sizing' and 'cxi' in file:
+                with h5py.File(s, 'r') as f:
+                    key = 'entry_1/sizing/short_axis_diameter'
+                    if key not in f :
+                        file_status = False
 
+            elif job_name == 'sizing' and 'events' in file:
+                with h5py.File(s, 'r') as f:
+                    key = 'sizing/short_axis_diameter'
+                    if key not in f :
+                        file_status = False
+            
             #print(s, file_status)
         return file_status
         

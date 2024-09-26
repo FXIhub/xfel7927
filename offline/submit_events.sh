@@ -20,9 +20,9 @@ sbatch <<EOT
 #SBATCH -J events-${EXP_ID}
 #SBATCH -o ${EXP_PREFIX}/scratch/log/events-${EXP_ID}-%A-%a.out
 #SBATCH -e ${EXP_PREFIX}/scratch/log/events-${EXP_ID}-%A-%a.out
-###SBATCH --partition=upex-beamtime
-###SBATCH --reservation=upex_${EXP_ID}
-#SBATCH --partition=upex
+#SBATCH --partition=upex-beamtime
+#SBATCH --reservation=upex_${EXP_ID}
+##SBATCH --partition=upex
 
 source /etc/profile.d/modules.sh
 source $PARENT_DIR/source_this_at_euxfel

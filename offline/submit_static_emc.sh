@@ -20,9 +20,9 @@ sbatch <<EOT
 #SBATCH -J static_emc-${EXP_ID}
 #SBATCH -o ${EXP_PREFIX}/scratch/log/static_emc-${EXP_ID}-%A-%a.out
 #SBATCH -e ${EXP_PREFIX}/scratch/log/static_emc-${EXP_ID}-%A-%a.out
-###SBATCH --partition=upex-beamtime
-###SBATCH --reservation=upex_${EXP_ID}
-#SBATCH --partition=upex
+#SBATCH --partition=upex-beamtime
+#SBATCH --reservation=upex_${EXP_ID}
+##SBATCH --partition=upex
 
 # exit on first error
 set -e

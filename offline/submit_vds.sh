@@ -18,9 +18,9 @@ sbatch <<EOT
 #SBATCH -J vds-${EXP_ID}-\${a}
 #SBATCH -o ${EXP_PREFIX}/scratch/log/vds-${EXP_ID}-%A-%a.out
 #SBATCH -e ${EXP_PREFIX}/scratch/log/vds-${EXP_ID}-%A-%a.out
-###SBATCH --partition=upex-beamtime
-###SBATCH --reservation=upex_${EXP_ID}
-#SBATCH --partition=upex
+#SBATCH --partition=upex-beamtime
+#SBATCH --reservation=upex_${EXP_ID}
+##SBATCH --partition=upex
 
 set -e 
 
