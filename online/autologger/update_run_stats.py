@@ -131,13 +131,10 @@ def get_events_file_status(run, slurm_status, log_status, file_status):
     else :
         # check logs
         is_log_file, log_success = log_status.check_log(job_name, run)
-
-        if run == 37:
-            print('events status 37:', is_log_file, log_success)
         
         # check files
         files_ok = file_status.check_files(job_name, run)
-        
+
         if is_log_file :
             if files_ok and log_success :
                 out = 'ready'
@@ -190,6 +187,41 @@ def get_cxi_file_status(run, slurm_status, log_status, file_status):
     #print(job_name, run, is_running, is_log_file, files_ok) 
     return out
 
+def get_sizing_file_status(run, slurm_status, log_status, file_status):
+    job_name = 'sizing'
+    
+    if not running_on_maxwell :
+        return None
+        
+    # check if it is running
+    is_running = slurm_status.is_running(job_name, run)
+    
+    if is_running :
+        out = 'running'
+    else :
+        # check logs
+        is_log_file, log_success = log_status.check_log(job_name, run)
+        
+        # check files
+        files_ok = file_status.check_files('sizing', run)
+        
+        if is_log_file :
+            if files_ok and log_success :
+                out = 'ready'
+            # there is log file, it's not running, but no success line
+            else :
+                out = 'error'
+        else :
+            # log files were deleted or lost
+            if files_ok :
+                out = 'ready'
+            # no job was submitted
+            else :
+                out = ''
+    
+    #print(job_name, run, is_running, is_log_file, files_ok) 
+    return out
+
 def get_static_emc_file_status(run, slurm_status, log_status, file_status):
     job_name = 'static_emc'
 
@@ -208,8 +240,6 @@ def get_static_emc_file_status(run, slurm_status, log_status, file_status):
         # check files
         files_ok = file_status.check_files(job_name, run)
 
-        print('static emc', run, is_log_file, log_success, files_ok)
-        
         if is_log_file :
             if files_ok and log_success :
                 out = 'ready'
@@ -276,6 +306,7 @@ class Run_table():
                                 ('Events',     lambda x: get_events_file_status(x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('CXI',        lambda x: get_cxi_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('EMC files',  lambda x: get_cxi_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
+                                ('Sizing',     lambda x: get_sizing_file_status(  x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('Static EMC', lambda x: get_static_emc_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('Comments',   lambda x: None)])
         self.headings = headings

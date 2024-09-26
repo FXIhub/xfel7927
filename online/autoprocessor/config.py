@@ -49,4 +49,14 @@ def static_emc(run, run_table):
     command = f". {script_dir}/submit_static_emc.sh {run}"
     return run_script, command
 
+def sizing(run, run_table):
+    run_script = False
+    if all(i not in run_table[run]['Sizing'] for i in s):
+        if run_table[run]['CXI'] == 'ready':
+            if run_table[run]['Sample'] == 'Cubic DNA origami':
+                run_script = True
+        
+    command = f". {script_dir}/submit_sizing.sh {run}"
+    return run_script, command
+
 scripts = [vds, events, cxi, static_emc]
