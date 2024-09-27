@@ -22,7 +22,7 @@ parser.add_argument('--out_folder_powder',
 parser.add_argument('-m', '--masks', 
                     help=f'pixel masks to apply before calculating litpixels and photon counts located in {PREFIX}scratch/det/. Mask must be 1 for good and 0 for bad, and the data must be in /entry_1/good_pixels)',
                     type=str, nargs='+',
-                    default=['r0040_good_pixels.h5', 'hit_finding_mask.h5'] )
+                    default=['r0065_mask.h5', 'hit_finding_mask.h5'] )
 args = parser.parse_args()
 
 args.masks = [f'{PREFIX}scratch/det/{f}' for f in args.masks]

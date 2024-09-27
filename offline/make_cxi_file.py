@@ -7,7 +7,7 @@ parser.add_argument('run', type=int, help='Run number')
 parser.add_argument('-s', '--sample_name',
                     help='name of sample',
                     type=str, default='DNA Pointer')
-parser.add_argument('-m', '--mask', type=str, default='r0040_good_pixels.h5', help=f'filename of global good pixels mask, located in {PREFIX}/scratch/det/')
+parser.add_argument('-m', '--mask', type=str, default='r0065_mask.h5', help=f'filename of global good pixels mask, located in {PREFIX}/scratch/det/')
 
 args = parser.parse_args()
     
