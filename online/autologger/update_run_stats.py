@@ -356,6 +356,20 @@ class Run_table():
             run_dict[run_number] = OrderedDict()
             for r, h in zip(row, self.headings.keys()):
                 run_dict[run_number][h] = r
+
+        # update hit rate
+        for row in run_table:
+            run_number = int(row[0])
+            hits = run_dict[run_number]['Num Hits']
+            trains = run_dict[run_number]['Num Trains']
+            pulses = run_dict[run_number]['Num Pulses']
+    
+            if hits is not None and trains is not None and pulses is not None:
+                frames =  trains * pulses
+                hit_rate = np.round(100 * hits/frames, 3)
+            else :
+                hit_rate = None
+            run_dict[run_number]['Hit Rate'] = hit_rate
         
         run_dict['last_update'] = time.time()
             
