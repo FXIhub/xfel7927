@@ -44,14 +44,13 @@ def get_duration(s0, s1):
     return out
 
 def get_calibrated_data_status(run_json):
-    if run_json['cal_num_requests'] == 0 :
-        out = 'not requested'
-    
+    if run_json['cal_pipeline_reply'] == "Calibration jobs succeeded" :
+        out = 'ready'
+    # sometimes this is zero when cal is finished
+    #if run_json['cal_num_requests'] == 0 :
+    #    out = 'not requested'
     else :
-        if run_json['cal_last_end_at'] is not None :
-            out = 'ready'
-        
-        elif run_json['cal_last_begin_at'] is not None :
+        if run_json['cal_last_begin_at'] is not None :
             out = 'running'
         
         else :
@@ -326,8 +325,7 @@ class Run_table():
 
     def update(self): 
         # dictionary
-        msg = MetadataClient.get_proposal_runs(self.comm, self.proposal_number)
-        #print(msg.keys())
+        msg = MetadataClient.get_proposal_runs(self.comm, self.proposal_number, page_size=1000)
         
         assert(msg['success'] == True)
         
