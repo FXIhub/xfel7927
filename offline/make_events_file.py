@@ -126,11 +126,11 @@ class LitPixels():
             # mask bad cells and pixels
             vals[np.isin(cids, BAD_CELLIDS)] = 0
             vals *= mask
-
+             
             t = np.sum(vals, axis=0, dtype=np_powder.dtype)
             #print(np_powder.dtype, np_powder.shape, vals.dtype, vals.shape, t.dtype, t.shape)
             np_powder           += t
-
+             
             # apply hitfinding mask
             vals *= self.mask
             
@@ -193,6 +193,7 @@ with h5py.File(vds_file, 'r') as f_vds:
 with h5py.File(out_fname, 'a') as f:
     utils.update_h5(f, 'total_intens', np.array(photon_counts), compression=True)
     utils.update_h5(f, 'litpixels', np.array(litpixels), compression=True)
+    
     utils.update_h5(f, 'trainId', trainId, compression=True)
     utils.update_h5(f, 'cellId', cellId, compression=True)
     utils.update_h5(f, 'pulseId', pulseId, compression=True)

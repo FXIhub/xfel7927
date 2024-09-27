@@ -31,13 +31,13 @@ set -e
 
 run=\${SLURM_ARRAY_TASK_ID}
 
-python make_events_file.py \${run} -n 32
+python make_events_file.py \${run} -n 32 
 
 # add pulse energy
 python add_pulsedata.py \${run}
 
 # add is_hit
-python add_is_hit.py \${run} -t 5
+python add_is_hit.py \${run} -t 5 --per_train
 
 echo events done
 EOT
