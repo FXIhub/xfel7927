@@ -8,7 +8,7 @@ print('script directory:', script_dir)
 
 s = ['ready', 'error', 'running']
 
-samples = ['DNA Origami Cube', 'DNA-origami Pointer']
+samples = ['DNA Origami Cube', 'DNA-origami Pointer', 'Erythrocruorin']
 
 def vds(run, run_table):
     run_script = False
@@ -16,6 +16,8 @@ def vds(run, run_table):
     
         if run_table[run]['Calib'] == 'ready':
             if run_table[run]['Sample'] in samples :
+                run_script = True
+            if run_table[run]['Run Type'] in 'Gas background' :
                 run_script = True
     
     command = f'. {script_dir}/submit_vds.sh {run}'
@@ -26,6 +28,8 @@ def events(run, run_table):
     if all(i not in run_table[run]['Events'] for i in s):
         if run_table[run]['VDS'] == 'ready':
             if run_table[run]['Sample'] in samples :
+                run_script = True
+            if run_table[run]['Run Type'] in 'Gas background' :
                 run_script = True
     
     command = f'. {script_dir}/submit_events.sh {run}'
