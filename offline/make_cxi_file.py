@@ -72,7 +72,7 @@ with h5py.File(args.events_file) as f:
     m = f['is_miss'][()]
     indices_miss = np.where(m)[0]
     
-    cellId_lit    = f['cellId'][:, 0]
+    cellId_lit    = f['cellId'][:]
     trainId_lit   = f['trainId'][()]
     pulseId_lit   = f['pulseId'][()]
 
