@@ -332,6 +332,9 @@ class Run_table():
         assert(msg['success'] == True)
         
         run_stats = msg['data']['runs']
+
+        #import pickle 
+        #pickle.dump(run_stats, open('run_stats.pickle', 'wb'))
         
         # sort by run number
         r = [run['run_number'] for run in run_stats]
