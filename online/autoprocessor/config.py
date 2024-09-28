@@ -8,7 +8,7 @@ print('script directory:', script_dir)
 
 s = ['ready', 'error', 'running']
 
-samples = ['DNA Origami Cube', 'DNA-origami Pointer', 'Erythrocruorin']
+samples = ['DNA Origami Cube', 'DNA Origami Twister', 'DNA-origami Pointer', 'Erythrocruorin', 'AuNP']
 
 def vds(run, run_table):
     run_script = False
