@@ -1,4 +1,4 @@
-3# Offline data access
+# Offline data access
 
 To access the offline computer cluster, login to the display gateway of the Maxwell cluster:
 
@@ -55,7 +55,7 @@ source xfel7927/source_this_at_euxfel
 Once you login to the cluster you will start in your home directory. To go to the experiment directory, write:
 
 ```
-cd /gpfs/exfel/exp/SPB/...
+cd /gpfs/exfel/exp/SPB/202405/p007927
 ```
 
 This contains the `proc` folder for processed runs, `raw` folder for raw data runs, `usr` for smaller user files like software and calibration files and `scratch` for larger data files. Please make a folder in `scratch` with your UPEX user name and place your analysis output for the experiment there:
