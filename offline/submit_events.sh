@@ -39,6 +39,7 @@ python add_pulsedata.py \${run}
 
 # add is_hit
 #python add_is_hit.py \${run} -t 5 --per_train
+python add_is_hit_proc.py \${run} -t 5 --modules 15
 
 echo events done
 EOT
