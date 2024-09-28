@@ -12,5 +12,5 @@ The boolean mask is saved to:
 exfel-python has all of the dependencies built in:
 ```
 $ module load exfel exfel-python
-$ python maskmaker.py /home/amorgan/p003004/scratch/amorgan/scratch/dark/r0290_dark.h5/data/sigma -m badpixel_mask_r0195.h5/entry_1/good_pixels 
+# python maskmaker.py /gpfs/exfel/exp/SPB/202405/p007927/scratch/saved_hits/r0065_hits.cxi/entry_1/instrument_1/detector_1/background -g /gpfs/exfel/exp/SPB/202405/p007927/scratch/saved_hits/r0065_hits.cxi/entry_1/instrument_1/detector_1/xyz_map
 ```
