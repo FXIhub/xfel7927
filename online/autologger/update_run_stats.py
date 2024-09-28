@@ -236,6 +236,36 @@ def get_sizing_file_status(run, slurm_status, log_status, file_status):
     #print(job_name, run, is_running, is_log_file, files_ok) 
     return out
 
+def get_intensity_file_status(run, slurm_status, log_status, file_status):
+    job_name = 'intensity'
+    
+    if not running_on_maxwell :
+        return None
+        
+    # check if it is running
+    is_running = slurm_status.is_running(job_name, run)
+    
+    if is_running :
+        out = 'running'
+    else :
+        # check logs
+        is_log_file, log_success = log_status.check_log(job_name, run)
+        
+        # check files
+        files_ok = file_status.check_files(job_name, run)
+        
+        if is_log_file :
+            if files_ok and log_success :
+                out = 'ready'
+            # there is log file, it's not running, but no success line
+            else :
+                out = 'error'
+        else :
+            out = ''
+    
+    #print(job_name, run, is_running, is_log_file, files_ok) 
+    return out
+
 def get_static_emc_file_status(run, slurm_status, log_status, file_status):
     job_name = 'static_emc'
 
@@ -321,6 +351,7 @@ class Run_table():
                                 ('CXI',        lambda x: get_cxi_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('EMC files',  lambda x: get_cxi_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('Sizing',     lambda x: get_sizing_file_status(  x['run_number'], self.slurm_status, self.log_status, self.file_status)),
+                                ('Peak Intensity',     lambda x: get_intensity_file_status(  x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('Static EMC', lambda x: get_static_emc_file_status(   x['run_number'], self.slurm_status, self.log_status, self.file_status)),
                                 ('Comments',   lambda x: None)])
         self.headings = headings
@@ -352,7 +383,7 @@ class Run_table():
                 #    #print(run)
                 #    print(e)
             run_table.append(row)
-        
+                
         # make run dict for log
         # run_dict[run_number] = {'VDS': 'ready', ...}
         run_dict = OrderedDict()
@@ -379,8 +410,13 @@ class Run_table():
                 hit_rate = None
             run_dict[run_number]['Hit Rate'] = hit_rate
             
-            row[i] = hit_rate
-            
+            #row[i] = hit_rate
+
+        #for row in run_table :
+        #    print(row)
+        #import sys
+        #sys.exit()
+        
         run_dict['last_update'] = time.time()
             
         # save run table, json or pickle?

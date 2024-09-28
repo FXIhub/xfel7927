@@ -25,6 +25,7 @@ job_files = {'vds'    : [f'{PREFIX}/scratch/vds/rrun.cxi'],
              'events' : [f'{PREFIX}/scratch/events/rrun_events.h5'], 
              'cxi'    : [f'{PREFIX}/scratch/saved_hits/rrun_hits.cxi', f'{PREFIX}/scratch/emc/rrun.emc'],
              'sizing' : [f'{PREFIX}/scratch/saved_hits/rrun_hits.cxi', f'{PREFIX}/scratch/events/rrun_events.h5'],
+             'intensity' : [f'{PREFIX}/scratch/log/peak_intensity_report.pdf'],
              'static_emc' : [f'{PREFIX}/scratch/static_emc/rrun/recon.pdf']}
 
 

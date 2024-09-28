@@ -65,4 +65,13 @@ def sizing(run, run_table):
     command = f". {script_dir}/submit_sizing.sh {run}"
     return run_script, command
 
-scripts = [vds, events, cxi, static_emc, sizing]
+def intensity(run, run_table):
+    run_script = False
+    if all(i not in run_table[run]['Peak Intensity'] for i in s):
+        if run_table[run]['Sizing'] == 'ready':
+            run_script = True
+        
+    command = f". {script_dir}/submit_intensity.sh"
+    return run_script, command
+
+scripts = [vds, events, cxi, static_emc, sizing, intensity]

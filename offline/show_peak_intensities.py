@@ -3,6 +3,7 @@ import h5py
 import matplotlib.pyplot as plt
 import os
 import glob
+from tqdm import tqdm
 
 PREFIX = os.environ["EXP_PREFIX"]
 
@@ -19,9 +20,10 @@ with h5py.File(fnam) as f:
 fnams = sorted(glob.glob(f'{PREFIX}/scratch/saved_hits/*.cxi'))
 
 
-runs = []
-photons = []
-for fnam in fnams:
+runs = {}
+photons = {}
+
+for fnam in tqdm(fnams):
     run = int(fnam[-13:-9])
     with h5py.File(fnam) as f:
         if '/entry_1/sizing' in f:
@@ -36,16 +38,33 @@ for fnam in fnams:
             ds = np.where( (sizes > size_min) * (sizes < size_max) )[0]
             
             if len(ds) > 0 :
-                for d in ds :
-                    photons.append(np.sum(data[d] * mask * hit_mask))
-                    runs.append(run)
+                name = f['entry_1/sample_1/name'][()].decode('utf-8')
+                 
+                key = '/entry_1/instrument_1/detector_1/hit_score'
+                if key not in f:
+                    key = '/entry_1/instrument_1/detector_1/lit_pixels'
+                
+                lit = f[key][()][ds]
+
+                if name not in runs :
+                    runs[name] = []
+                
+                if name not in photons :
+                    photons[name] = []
+                 
+                for d in ds[np.argsort(lit[::-1])][:100] :
+                    photons[name].append(np.sum(data[d] * mask * hit_mask))
+                    runs[name].append(run)
 
 # plot
 fig, ax = plt.subplots(1, 1)
 fig.set_size_inches(10, 5)
-fig.set_layout_engine('compressed')
+fig.set_tight_layout(True)
 
-ax.scatter(runs, photons, alpha=0.5, s=0.8)
+for name in runs.keys():
+    ax.scatter(runs[name], photons[name], alpha=0.3, s=1.0, label=name)
+ax.legend()
+ax.set_yscale('log')
 ax.spines[['right', 'top']].set_visible(False)
 ax.set_xlabel('run number')
 ax.set_ylabel('photon counts')
