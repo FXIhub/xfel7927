@@ -55,6 +55,7 @@ h5ls r0035_events.h5
 /is_hit                  Dataset {1055808}
 /is_miss                 Dataset {1055808}
 /litpixels               Dataset {1055808}
+/hitscore               Dataset {1055808}
 /pulseId                 Dataset {1055808}
 /pulse_energy            Dataset {1055808}
 /total_intens            Dataset {1055808}
@@ -80,6 +81,11 @@ with h5py.File(args.events_file) as f:
     litpixels    = f['litpixels'][()]
     pulse_energy = f['pulse_energy'][()]
     wavelength   = f['wavelength'][()]
+
+    if 'hit_score' in f :
+        hitscore    = f['hit_score'][()]
+    else :
+        hitscore    = None
 
 print(wavelength.shape)
 photon_energy = sc.h * sc.c / wavelength
@@ -156,6 +162,10 @@ with h5py.File(args.output_file, 'w') as f:
     detector_1.create_dataset("lit_pixels",   data = litpixels[indices].astype(np.float32), compression='gzip', compression_opts=1, shuffle=True, chunks = True)
     detector_1['photon_counts'].attrs['axes'] = "experiment_identifier"
     detector_1['lit_pixels'].attrs['axes'] = "experiment_identifier"
+
+    if hitscore is not None :
+        detector_1.create_dataset("hit_score",   data = hitscore[indices].astype(np.float32), compression='gzip', compression_opts=1, shuffle=True, chunks = True)
+        detector_1['hit_score'].attrs['axes'] = "experiment_identifier"
     
     # write pixel map
     detector_1.create_dataset('xyz_map', data = xyz, compression='gzip', compression_opts=1, shuffle = True, dtype = np.float32)
@@ -252,7 +262,7 @@ def worker(rank, lock):
     if lock.acquire() :
         with h5py.File(args.output_file, 'a') as f:
             for i in it :
-                f['entry_1/instrument_1/detector_1/data'][events_rank[rank] + i] = frame_buf[i]
+                f['entry_1/instrument_1/detector_1/data'][events_rank[rank] + i] = np.clip(frame_buf[i], 0, np.iinfo(frame_buf.dtype).max)
             
             # update powder
             powder_file  = f['entry_1/instrument_1/detector_1/powder'][()]
