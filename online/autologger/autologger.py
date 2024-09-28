@@ -13,11 +13,15 @@ sheet_id       = '85516743'
 run_table_obj = update_run_stats.Run_table(proposal_number)
 
 while True :
-    # update run table
-    headings, run_table = run_table_obj.update()
-    
-    # post to google spread sheet
-    update_google_sheet.batch_update_values(spreadsheet_id, sheet_id, headings, run_table)
-    
-    print('sleeping')
-    time.sleep(5)
+    try : 
+        # update run table
+        headings, run_table = run_table_obj.update()
+        
+        # post to google spread sheet
+        update_google_sheet.batch_update_values(spreadsheet_id, sheet_id, headings, run_table)
+        
+        print('sleeping')
+        time.sleep(5)
+    except Exception as e:
+        print(e)
+

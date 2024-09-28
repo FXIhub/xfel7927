@@ -8,7 +8,7 @@ conda activate /home/amorgan/.conda/envs/EMC
 run=$(printf %.4d "${1}")
 static_dir=${EXP_PREFIX}scratch/static_emc
 cxi_dir=${EXP_PREFIX}scratch/saved_hits
-geom=${EXP_PREFIX}usr/geom/motor_p7076_from_4462.geom
+geom=${PWD}/geom/r${run}.geom
 mask=${EXP_PREFIX}scratch/det/static_emc_mask.h5
 
 config=$(python make_config.py ${run} --cxi_dir ${cxi_dir} --output_dir ${static_dir} --mask ${mask} --geom ${geom})

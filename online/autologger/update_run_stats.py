@@ -172,6 +172,8 @@ def get_cxi_file_status(run, slurm_status, log_status, file_status):
         
     # check if it is running
     is_running = slurm_status.is_running(job_name, run)
+
+    print(run, 'cxi is running', is_running)
     
     if is_running :
         out = 'running'
@@ -358,6 +360,7 @@ class Run_table():
                 run_dict[run_number][h] = r
 
         # update hit rate
+        i = list(self.headings.keys()).index('Hit Rate')
         for row in run_table:
             run_number = int(row[0])
             hits = run_dict[run_number]['Num Hits']
@@ -366,11 +369,15 @@ class Run_table():
     
             if hits is not None and trains is not None and pulses is not None:
                 frames =  trains * pulses
-                hit_rate = np.round(100 * hits/frames, 3)
+
+                # I believe it gets converted to % and rounded by google
+                hit_rate = hits/frames
             else :
                 hit_rate = None
             run_dict[run_number]['Hit Rate'] = hit_rate
-        
+            
+            row[i] = hit_rate
+            
         run_dict['last_update'] = time.time()
             
         # save run table, json or pickle?

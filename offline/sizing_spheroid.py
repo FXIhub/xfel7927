@@ -81,7 +81,7 @@ def bin(ar, N = 4):
 def quadratic_refine(f, x, lim=3):
     N = f.shape[0]
     if N < 10 :
-        return x, False
+        return x[0], False
     
     Q = np.empty((N, 10))
     for n in range(N):
@@ -284,19 +284,18 @@ class Sizing():
                         ijk = np.ravel_multi_index((i, j, kk), (self.ac.shape[0], self.u.shape[0], self.v.shape[0]))
                         errs.append(self.errs[ijk])
                         acv.append([1e9 * self.radii[ai+x], 1e9 * self.radii[ci+y], self.v[kk]])
-                        print('hello')
-                        print(errs[-1])
-                        print(acv[-1])
-                        print()
 
-        if len(errs) == 27 :
-            print(np.array(errs).reshape(3,3,3))
-        
         # now use quadratic refinement to locate the minimum
         (a, c, v), res = quadratic_refine(np.array(errs), np.array(acv))
-        print(a, c, v, res)
+        a = a * 1e-9
+        c = c * 1e-9
         
-        return 1e-9 * a, 1e-9 * c, v
+        if res == False :
+            a = self.radii[ai]
+            c = self.radii[ci]
+            v = self.v[k]
+        
+        return a, c, v
         
     def size(self, ar, quadratic_refinement = True):
         # normalise
@@ -310,8 +309,6 @@ class Sizing():
         
         i, j, k = np.unravel_index(imin, (self.ac.shape[0], self.u.shape[0], self.v.shape[0]))
         ai, ci  = self.ac[i]
-        print('\n\n')
-        print(ai, ci, i, j, k)
         
         if quadratic_refinement :
             a, c, v = self.quadratic_refinement(ai, ci, i, j, k, imin)
