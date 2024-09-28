@@ -8,13 +8,17 @@ import pickle
 from tqdm import tqdm
 import signal
 
-import skimage.measure
-import skimage.segmentation
+#import skimage.measure
+#import skimage.segmentation
+
+import extra_geom
 
 #from constants import PREFIX
 
 # for (much faster) local viewing
-PREFIX='/home/andyofmelbourne/Documents/2024/p7076'
+#PREFIX='/home/andyofmelbourne/Documents/2024/p7076'
+PREFIX='/gpfs/exfel/exp/SPB/202405/p007927'
+geom_fnam='/gpfs/exfel/exp/SPB/202405/p007927/usr/Shared/amorgan/xfel7927/geom/r0120.geom'
 
 DATA_PATH = 'entry_1/instrument_1/detector_1/data'
 MASK_PATH = 'entry_1/instrument_1/detector_1/mask'
@@ -30,18 +34,15 @@ def clip_scalar(val, vmin, vmax):
     """ convenience function to avoid using np.clip for scalar values """
     return vmin if val < vmin else vmax if val > vmax else val
 
+
 class Application(QtWidgets.QMainWindow):
-    def __init__(self, powder, data, mask, sorted_indices, indices_image_space, background_mask, xy_map, im_shape, d, litpix):
+    def __init__(self, powder, data, mask, geom, sorted_indices, litpix):
         super().__init__()
         self.Z = data.shape[0]
         self.frame_index = -999
         
         self.sorted_indices = sorted_indices
          
-        self.xmin, self.ymin, self.dx = d
-        
-        self.im_shape = im_shape
-
         self.powder = powder
         self.z_data = data
         self.z_mask = data
@@ -49,11 +50,15 @@ class Application(QtWidgets.QMainWindow):
         self.litpix = litpix
          
         self.data = np.empty(np.squeeze(data[0]).shape, dtype=np.float32)
-        
-        self.pixel_map       = indices_image_space
-        self.background_mask = background_mask
 
-        self.display = np.zeros(background_mask.shape, dtype=np.float32)
+        # get image shape
+        im, centre = geom.position_modules(data[0])
+        
+        self.centre = centre[::-1]
+
+        self.geom = geom
+        
+        self.display = np.zeros(im.shape, dtype=np.float32)
           
         self.in_replot = False
         
@@ -68,10 +73,7 @@ class Application(QtWidgets.QMainWindow):
         self.plot = pg.ImageView()
 
         # add a + at the origin
-        # x=0, i = -xmin / dx + 0.5
-        i0 = -self.xmin / self.dx + 0.5
-        j0 = -self.ymin / self.dx + 0.5
-        scatter = pg.ScatterPlotItem([{'pos': (i0, j0), 'size': 5, 'pen': pg.mkPen('r'), 'brush': pg.mkBrush('r'), 'symbol': '+'}])
+        scatter = pg.ScatterPlotItem([{'pos': self.centre, 'size': 5, 'pen': pg.mkPen('r'), 'brush': pg.mkBrush('r'), 'symbol': '+'}])
         self.plot.addItem(scatter)
         
         if self.Z > 1 :
@@ -111,7 +113,7 @@ class Application(QtWidgets.QMainWindow):
                 print('sorted index', i, 'file index', j, 'litpixels', self.litpix[i], self.data.dtype)
                 
                 if self.frame_index >= 0 :
-                    self.data[:] = np.squeeze(self.z_data[j] * self.z_mask[j])
+                    self.data[:] = np.squeeze(self.z_data[j])
                 elif self.frame_index == -1 :
                     self.data[:] = np.squeeze(self.powder)
                 
@@ -125,11 +127,11 @@ class Application(QtWidgets.QMainWindow):
         with masked pixels shown in blue at the maximum value of the cspad. 
         This ensures that the masked pixels are shown at full brightness.
         """
-        self.display[~self.background_mask] = self.data.ravel()[self.pixel_map]
+        self.geom.position_modules(self.data, out = self.display)
         if not auto :
-            self.plot.setImage(self.display.reshape(self.im_shape))
+            self.plot.setImage(self.display.T[::-1])
         else :
-            self.plot.setImage(self.display.reshape(self.im_shape), autoRange = False, autoLevels = False, autoHistogramRange = False)
+            self.plot.setImage(self.display.T[::-1], autoRange = False, autoLevels = False, autoHistogramRange = False)
 
     def keyPressEvent(self, event):
         super(Application, self).keyPressEvent(event)
@@ -145,56 +147,6 @@ class Application(QtWidgets.QMainWindow):
             self.vline.setValue(ind)
             self.replot_frame()
         
-    
-
-def generate_pixel_lookup(xyz, oversampling = 1):
-    # choose xy bounds
-    xmin = xyz[0].min()
-    xmax = xyz[0].max()
-    
-    ymin = xyz[1].min()
-    ymax = xyz[1].max()
-    
-    # choose sampling
-    dx = 177e-6 / oversampling
-    
-    shape = (int( (xmax-xmin)/dx ) + 2, int( (ymax-ymin)/dx ) + 2)
-
-    # pixel coordinates in im
-    ss = np.round((xyz[0] - xmin) / dx).astype(int)
-    fs = np.round((xyz[1] - ymin) / dx).astype(int)
-    
-    i, j = np.indices(shape)
-    xy_map = np.empty((2,) + shape, dtype=float)
-    xy_map[0] = dx * i
-    xy_map[1] = dx * j
-    
-    # now use pixel indices as labels
-    i = np.arange(xyz[0].size)
-     
-    # create an image of the data raveled indices
-    im = -np.ones(shape, dtype=int)
-    im[ss.ravel(), fs.ravel()] = i
-    
-    # label image
-    # problem, the labells dont equal i
-    #l = skimage.measure.label(im, background=-1)
-    
-    # expand by oversampling rate (to fill gaps)
-    l = skimage.segmentation.expand_labels(im+1, distance = oversampling)
-        
-    # set background mask
-    background_mask = (l.ravel()==0).copy()
-    
-    # now subtract 1 from labels to turn them into pixel indices
-    l -= 1
-    
-    indices_image_space = l.ravel()[~background_mask].copy()
-    
-    # now to map data to 2D image we have:
-    # im[~background] = data.ravel()[indices_image_space]
-    return indices_image_space, background_mask, shape, (xmin, ymin, dx), im, i, l
-
 args = parse_cmdline_args()
 args.run  = args.cxi
 args.cxi  = PREFIX+'/scratch/saved_hits/r%.4d_hits.cxi'%args.cxi
@@ -212,7 +164,8 @@ data = f[DATA_PATH]
 
 if args.litpixels :
     with h5py.File(args.cxi) as f:
-        litpixels = f['/entry_1/instrument_1/detector_1/lit_pixels'][()]
+        litpixels = f['/entry_1/instrument_1/detector_1/hit_score'][()]
+        #litpixels = f['/entry_1/instrument_1/detector_1/lit_pixels'][()]
         sorted_indices    = np.argsort(litpixels)[::-1]
         litpix    = litpixels[sorted_indices]
         sort = True
@@ -226,14 +179,14 @@ if args.apply_mask:
 else :
     mask = np.ones((data.shape[0],), dtype = int)
 
-# generate pixel lookup
-indices_image_space, background_mask, im_shape, (xmin, ymin, dx), im, i, l = generate_pixel_lookup(xyz)
+
+geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)
 
 # Always start by initializing Qt (only once per application)
 signal.signal(signal.SIGINT, signal.SIG_DFL) # allow Control-C
 app = QtWidgets.QApplication([])
     
-a = Application(powder, data, mask, sorted_indices, indices_image_space, background_mask, xyz, im_shape, (xmin, ymin, dx), litpix)
+a = Application(powder, data, mask, geom, sorted_indices, litpix)
 a.show()
 
 ## Start the Qt event loop
