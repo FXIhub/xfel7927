@@ -121,11 +121,11 @@ def get_num_hits(run):
     if running_on_maxwell :
         fnam = PREFIX + '/scratch/events/r%.4d_events.h5' % run
         if os.path.exists(fnam) :
-            print('get_num_hits:', fnam, os.path.exists(fnam))
+            #print('get_num_hits:', fnam, os.path.exists(fnam))
             with h5py.File(fnam) as f:
                 if 'is_hit' in f :
                     hits = int(np.sum(f['is_hit'][()]))
-                    print('hits = ', hits)
+                    #print('hits = ', hits)
     return hits
     
 
@@ -173,7 +173,7 @@ def get_cxi_file_status(run, slurm_status, log_status, file_status):
     # check if it is running
     is_running = slurm_status.is_running(job_name, run)
 
-    print(run, 'cxi is running', is_running)
+    #print(run, 'cxi is running', is_running)
     
     if is_running :
         out = 'running'
@@ -253,6 +253,8 @@ def get_intensity_file_status(run, slurm_status, log_status, file_status):
         
         # check files
         files_ok = file_status.check_files(job_name, run)
+
+        print(run, job_name, is_log_file, files_ok)
         
         if is_log_file :
             if files_ok and log_success :

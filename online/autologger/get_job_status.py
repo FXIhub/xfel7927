@@ -51,8 +51,6 @@ class SLURM_status():
         match = fnmatch.filter(self.slurm_jobs, job_string)
         running = len(match) > 0
 
-        if run == 37:
-            print('slurm', run, job_name, job_string, match, running)
         return running
 
 
@@ -78,8 +76,6 @@ class LOG_status():
             cmd = subprocess.run(grp, shell=True, text=True, stdout=subprocess.PIPE).stdout
             #log_success = len(cmd.stdout) > 0
 
-            if run == 37 :
-                print('Log status 37:', grp, cmd)
             if cmd :
                 log_success = True
         return is_log_file, log_success

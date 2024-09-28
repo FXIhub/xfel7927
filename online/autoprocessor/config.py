@@ -71,7 +71,7 @@ def intensity(run, run_table):
         if run_table[run]['Sizing'] == 'ready':
             run_script = True
         
-    command = f". {script_dir}/submit_intensity.sh"
+    command = f". {script_dir}/submit_intensity.sh {run}"
     return run_script, command
 
 scripts = [vds, events, cxi, static_emc, sizing, intensity]

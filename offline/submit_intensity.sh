@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# call: ./submit_intensity.sh 
+# call: ./submit_intensity.sh run
 
 source /etc/profile.d/modules.sh
 
