@@ -33,7 +33,7 @@ source $PARENT_DIR/source_this_at_euxfel
 run=\${SLURM_ARRAY_TASK_ID}
 echo ${1} run = \${run}   sample = ${2}
 
-python make_cxi_file.py \${run} -s ${2}
+python make_cxi_file.py \${run} -s ${2} -m r0400_mask.h5
 
 # add background
 python add_background_cxi.py \${run}

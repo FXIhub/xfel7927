@@ -74,45 +74,14 @@ tra_out = trainId_vds.copy()
 cel_out = cellId_vds.copy()
 pul_out = pulseId_vds.copy()
 
-dropped_trains = 0
-dropped_pulses = 0
-for i, t in tqdm(enumerate(tr), total = len(tr)):
-    # events in extra data with this train id 
-    j = np.where(trainId == t)[0]
-    # events in vds with this train id 
-    k = np.where(trainId_vds == t)[0]
+utils.put_a_in_b_by_train(is_hit, trainId, cellId, hit_out, trainId_vds, cellId_vds)
+utils.put_a_in_b_by_train(is_miss, trainId, cellId, mis_out, trainId_vds, cellId_vds)
+utils.put_a_in_b_by_train(litpixels, trainId, cellId, lit_out, trainId_vds, cellId_vds)
+utils.put_a_in_b_by_train(photon_counts, trainId, cellId, pho_out, trainId_vds, cellId_vds)
+utils.put_a_in_b_by_train(trainId, trainId, cellId, tra_out, trainId_vds, cellId_vds)
+utils.put_a_in_b_by_train(cellId, trainId, cellId, cel_out, trainId_vds, cellId_vds)
+utils.put_a_in_b_by_train(pulseId, trainId, cellId, pul_out, trainId_vds, cellId_vds)
 
-    if len(j) == 0 or len(k) == 0 :
-        dropped_trains += 1
-        continue
-    
-    # find cell ids common to vds and extra data
-    cells = set(cellId_vds[k]) & set(cellId[j])
-    
-    dropped_pulses += C - len(cells)
-    
-    if len(cells) == 0 :
-        dropped_trains += 1
-        continue
-        
-    for ii, c in enumerate(cells):
-        # events in extra data with this cell id 
-        jj = np.where(cellId[j] == c)[0]
-        # events in vds with this cell id 
-        kk = np.where(cellId_vds[k] == c)[0]
-        
-        # should be 1 number each
-        hit_out[k[kk]] = is_hit[j[jj]]
-        mis_out[k[kk]] = is_miss[j[jj]]
-        lit_out[k[kk]] = litpixels[j[jj]]
-        pho_out[k[kk]] = photon_counts[j[jj]]
-        tra_out[k[kk]] = trainId[j[jj]]
-        cel_out[k[kk]] = cellId[j[jj]]
-        pul_out[k[kk]] = pulseId[j[jj]]
-        
-
-print(f'dropped {dropped_trains} out of {len(tr)} trains')
-print(f'dropped {dropped_pulses} pulses within trains')
 assert(np.allclose(trainId_vds, tra_out))
 assert(np.allclose(cellId_vds, cel_out))
 assert(np.allclose(pulseId_vds, pul_out))

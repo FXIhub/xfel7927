@@ -78,20 +78,31 @@ for run in args.run :
     
     print('\nFound a total of:')
     N = len(is_hit)
-    hits = np.sum(is_hit)
+    hits   = np.sum(is_hit)
     misses = np.sum(is_miss)
     print(f'hits   : {hits :>10}{hits/N:>10.2%}')
     print(f'misses : {misses :>10}{misses/N:>10.2%}')
     print(f'frames : {N :>10}')
     print()
 
-    out = {'is_hit': is_hit, 'is_miss': is_miss}
+    # align with vds data
+    with h5py.File(events_fnam) as f:
+        pulseId = f['pulseId'][()]
+        trainId = f['trainId'][()]
+        is_hit_e  = np.zeros(pulseId.shape, dtype = bool)
+        is_miss_e = np.zeros(pulseId.shape, dtype = bool)
+        hit_score_e = np.zeros(pulseId.shape, dtype = hit_score.dtype)
+         
+    utils.put_a_in_b_by_train(is_hit,    hitfinder.trainId, hitfinder.pulseId, is_hit_e, trainId, pulseId)
+    utils.put_a_in_b_by_train(is_miss,   hitfinder.trainId, hitfinder.pulseId, is_miss_e, trainId, pulseId)
+    utils.put_a_in_b_by_train(hit_score, hitfinder.trainId, hitfinder.pulseId, hit_score_e, trainId, pulseId)
+
     
     print('writing to', events_fnam)
     with h5py.File(events_fnam, 'a') as f:
-        utils.update_h5(f, 'is_hit', is_hit, compression=True)
-        utils.update_h5(f, 'is_miss', is_miss, compression=True)
-        utils.update_h5(f, 'hit_score', hit_score, compression=True)
+        utils.update_h5(f, 'is_hit', is_hit_e, compression=True)
+        utils.update_h5(f, 'is_miss', is_miss_e, compression=True)
+        utils.update_h5(f, 'hit_score', hit_score_e, compression=True)
 
 
 

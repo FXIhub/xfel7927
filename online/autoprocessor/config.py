@@ -42,7 +42,7 @@ def cxi(run, run_table):
             if run_table[run]['Sample'] in samples :
                 run_script = True
         
-    command = f". {script_dir}/submit_cxi.sh {run} {run_table[run]['Sample']}"
+    command = f". {script_dir}/submit_cxi.sh {run} {run_table[run]['Sample'].replace(' ', '_')}"
     return run_script, command
 
 def static_emc(run, run_table):

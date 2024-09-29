@@ -21,7 +21,7 @@ PREFIX='/gpfs/exfel/exp/SPB/202405/p007927'
 geom_fnam='/gpfs/exfel/exp/SPB/202405/p007927/usr/Shared/amorgan/xfel7927/geom/r0120.geom'
 
 DATA_PATH = 'entry_1/instrument_1/detector_1/data'
-MASK_PATH = 'entry_1/instrument_1/detector_1/mask'
+MASK_PATH = 'entry_1/instrument_1/detector_1/good_pixels'
 
 def parse_cmdline_args():
     parser = argparse.ArgumentParser(description='view shots from saved hits in cxi files')
@@ -45,7 +45,7 @@ class Application(QtWidgets.QMainWindow):
          
         self.powder = powder
         self.z_data = data
-        self.z_mask = data
+        self.z_mask = mask
 
         self.litpix = litpix
          
@@ -113,7 +113,7 @@ class Application(QtWidgets.QMainWindow):
                 print('sorted index', i, 'file index', j, 'litpixels', self.litpix[i], self.data.dtype)
                 
                 if self.frame_index >= 0 :
-                    self.data[:] = np.squeeze(self.z_data[j])
+                    self.data[:] = np.squeeze(self.z_data[j] * self.z_mask)
                 elif self.frame_index == -1 :
                     self.data[:] = np.squeeze(self.powder)
                 
@@ -162,22 +162,24 @@ with h5py.File(args.cxi) as f:
 f = h5py.File(args.cxi)
 data = f[DATA_PATH]
 
+if args.apply_mask:
+    print('getting mask from', MASK_PATH)
+    mask = f[MASK_PATH][()]
+else :
+    mask = np.ones((data.shape[0],), dtype = int)
+
 if args.litpixels :
-    with h5py.File(args.cxi) as f:
-        #litpixels = f['/entry_1/instrument_1/detector_1/hit_score'][()]
-        litpixels = f['/entry_1/instrument_1/detector_1/lit_pixels'][()]
-        sorted_indices    = np.argsort(litpixels)[::-1]
-        litpix    = litpixels[sorted_indices]
-        sort = True
+    #with h5py.File(args.cxi) as f:
+    litpixels = f['/entry_1/instrument_1/detector_1/hit_score'][()]
+    #litpixels = f['/entry_1/instrument_1/detector_1/lit_pixels'][()]
+    sorted_indices    = np.argsort(litpixels)[::-1]
+    litpix    = litpixels[sorted_indices]
+    sort = True
 else :
     sorted_indices  = np.arange(data.shape[0])
     litpix = np.zeros((data.shape[0],))
     sort = False
 
-if args.apply_mask:
-    mask = f[MASK_PATH]
-else :
-    mask = np.ones((data.shape[0],), dtype = int)
 
 
 geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)

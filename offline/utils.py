@@ -15,6 +15,20 @@ def update_h5(f, key, value, compression = False):
         else :
             f.create_dataset(key, data = value)
 
+def put_a_in_b_by_train(a, a_tr, a_ce, b, b_tr, b_ce):
+    # align by train then pulse
+    trains = np.unique(a_tr)
+    a_dict = {t:{} for t in trains} 
+    for v, train, cell in zip(a, a_tr, a_ce):
+        a_dict[train][cell] = v
+    
+    for i, train, cell in zip(range(b.shape[0]), b_tr, b_ce):
+        if train in a_dict and cell in a_dict[train]:
+            b[i] = a_dict[train][cell]
+    return b
+        
+        
+
 prefix = {'y': 1e-24,  # yocto
           'z': 1e-21,  # zepto
           'a': 1e-18,  # atto
