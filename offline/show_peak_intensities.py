@@ -32,7 +32,8 @@ for fnam in tqdm(fnams):
             sizes /= 2
                
             mask  = f['/entry_1/instrument_1/detector_1/good_pixels'][()] 
-            
+            pulse_energy = f['/entry_1/instrument_1/source_1/pulse_energy'][:]
+            energy_ave = np.mean(pulse_energy)
             data = f['/entry_1/instrument_1/detector_1/data']
             
             ds = np.where( (sizes > size_min) * (sizes < size_max) )[0]
@@ -53,7 +54,7 @@ for fnam in tqdm(fnams):
                     photons[name] = []
                  
                 for d in ds[np.argsort(lit[::-1])][:100] :
-                    photons[name].append(np.sum(data[d] * mask * hit_mask))
+                    photons[name].append(np.sum(data[d] * mask * hit_mask)/energy_ave)
                     runs[name].append(run)
 
 # plot
