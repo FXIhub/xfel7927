@@ -170,8 +170,10 @@ else :
 
 if args.litpixels :
     #with h5py.File(args.cxi) as f:
-    litpixels = f['/entry_1/instrument_1/detector_1/hit_score'][()]
-    #litpixels = f['/entry_1/instrument_1/detector_1/lit_pixels'][()]
+    if '/entry_1/instrument_1/detector_1/hit_score' in f :
+        litpixels = f['/entry_1/instrument_1/detector_1/hit_score'][()]
+    else :
+        litpixels = f['/entry_1/instrument_1/detector_1/lit_pixels'][()]
     sorted_indices    = np.argsort(litpixels)[::-1]
     litpix    = litpixels[sorted_indices]
     sort = True

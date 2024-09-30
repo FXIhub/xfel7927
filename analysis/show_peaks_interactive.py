@@ -6,6 +6,11 @@ import os
 import glob
 from tqdm import tqdm
 
+
+import sys
+run_non_interactive = 'background' in sys.argv[1]
+
+
 PREFIX = os.environ["EXP_PREFIX"]
 
 sample = 'cube'
@@ -119,37 +124,38 @@ def load_frame(fnam, index):
     return frame
 
 
-#import pyqtgraph as pg
-fig_im, ax_im = plt.subplots()
-fig_im.set_size_inches(10, 10)
-fig_im.set_tight_layout(True)
+if run_non_interactive == False :
+    #import pyqtgraph as pg
+    fig_im, ax_im = plt.subplots()
+    fig_im.set_size_inches(10, 10)
+    fig_im.set_tight_layout(True)
 
-import extra_geom
-geom_fnam = '../geom/r0300.geom'
-geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)
+    import extra_geom
+    geom_fnam = '../geom/r0300.geom'
+    geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)
 
-name = list(files.keys())[0]
-fnam = files[name][0]
-i    = indexes[name][0]
+    name = list(files.keys())[0]
+    fnam = files[name][0]
+    i    = indexes[name][0]
 
-#geom.plot_data(load_frame(fnam, i), ax = ax_im, colorbar=False)
-frame_plot = ax_im.imshow(geom.position_modules(load_frame(fnam, i))[0]**0.2, vmin =0)
-fig_im.show()
+    #geom.plot_data(load_frame(fnam, i), ax = ax_im, colorbar=False)
+    frame_plot = ax_im.imshow(geom.position_modules(load_frame(fnam, i))[0]**0.2, vmin =0)
+    fig_im.show()
 
-def on_pick(event):
-    i = event.ind[0]
-    run   = runs[event.artist.name][i]
-    fnam  = files[event.artist.name][i]
-    index = indexes[event.artist.name][i]
-    print(f'clicked on run {run}, fnam {fnam}, index {index}')
-    
-    frame = load_frame(fnam, index)
-    
-    #geom.plot_data(frame, ax = ax_im, vmax = 3)
-    frame_plot.set_data(geom.position_modules(frame)[0]**0.2)
-    fig_im.canvas.draw()
-    fig_im.canvas.flush_events()
-    #ax_im.draw()
+    def on_pick(event):
+        i = event.ind[0]
+        run   = runs[event.artist.name][i]
+        fnam  = files[event.artist.name][i]
+        index = indexes[event.artist.name][i]
+        print(f'clicked on run {run}, fnam {fnam}, index {index}')
+        
+        frame = load_frame(fnam, index)
+        
+        #geom.plot_data(frame, ax = ax_im, vmax = 3)
+        frame_plot.set_data(geom.position_modules(frame)[0]**0.2)
+        fig_im.canvas.draw()
+        fig_im.canvas.flush_events()
+        #ax_im.draw()
     
 
 
@@ -209,11 +215,15 @@ ax.set_title(f"scatter plot of photon counts near optical axis for sizes: {int(1
 # For the minor ticks, use no labels; default NullFormatter.
 ax.xaxis.set_minor_locator(MultipleLocator(10))
 
-fig.canvas.callbacks.connect('pick_event', on_pick)
+if run_non_interactive == False :
+    fig.canvas.callbacks.connect('pick_event', on_pick)
+
 ax.grid(visible=True, which='both', alpha = 0.3)
 fig.show()
 
 plt.savefig(out)
-plt.show()
+
+if run_non_interactive == False :
+    plt.show()
             
 

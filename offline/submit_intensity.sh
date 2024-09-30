@@ -29,7 +29,7 @@ set -e
 source /etc/profile.d/modules.sh
 source $PARENT_DIR/source_this_at_euxfel
 
-python show_peak_intensities.py 
+python show_peaks_interactive.py background
 
 echo intensity done
 EOT
