@@ -8,7 +8,9 @@ from tqdm import tqdm
 
 
 import sys
-run_non_interactive = 'background' in sys.argv[1]
+run_non_interactive = False
+if len(sys.argv) > 1 :
+    run_non_interactive = 'background' in sys.argv[1]
 
 
 PREFIX = os.environ["EXP_PREFIX"]
