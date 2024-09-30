@@ -166,7 +166,7 @@ if args.apply_mask:
     print('getting mask from', MASK_PATH)
     mask = f[MASK_PATH][()]
 else :
-    mask = np.ones((data.shape[0],), dtype = int)
+    mask = 1
 
 if args.litpixels :
     #with h5py.File(args.cxi) as f:

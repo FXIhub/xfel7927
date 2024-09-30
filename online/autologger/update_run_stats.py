@@ -360,12 +360,16 @@ class Run_table():
         self.headings = headings
 
     def update(self): 
-        # dictionary
-        msg = MetadataClient.get_proposal_runs(self.comm, self.proposal_number, page_size=1000)
-        
-        assert(msg['success'] == True)
-        
-        run_stats = msg['data']['runs']
+        run_stats = []
+        print('downloading run stats from MyMdc')
+        for page in range(1, 100):
+            # dictionary
+            msg = MetadataClient.get_proposal_runs(self.comm, self.proposal_number, page_size=500, page=page)
+            assert(msg['success'] == True)
+            run_stats += msg['data']['runs']
+            print(len(run_stats), len(msg['data']['runs']))
+            if len(msg['data']['runs']) == 0 :
+                break
 
         #import pickle 
         #pickle.dump(run_stats, open('run_stats.pickle', 'wb'))

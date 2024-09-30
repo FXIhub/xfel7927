@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 import os
 import glob
 from tqdm import tqdm
@@ -13,6 +14,13 @@ size_max = 30e-9
 subtract_background = False
 normalise_pulse_energy = False
 display_background = True
+
+# just before refinement
+# + 0.5 so that we do not overlap with scatter
+focus_refined = np.array([111, 197, 285, 333, 371, 404, 413, 436, 456, 468, 494, 500, 536]) + 0.5
+
+# where He was not used inclusive
+no_he = [[1, 72], [111, 124], [221, 234], [336, 348], [484, 495]]
 
 
 out = f'{PREFIX}/scratch/log/peak_intensity_report.pdf'
@@ -125,7 +133,7 @@ fnam = files[name][0]
 i    = indexes[name][0]
 
 #geom.plot_data(load_frame(fnam, i), ax = ax_im, colorbar=False)
-frame_plot = ax_im.imshow(geom.position_modules(load_frame(fnam, i))[0], vmax = 3, vmin =0)
+frame_plot = ax_im.imshow(geom.position_modules(load_frame(fnam, i))[0]**0.2, vmin =0)
 fig_im.show()
 
 def on_pick(event):
@@ -138,7 +146,7 @@ def on_pick(event):
     frame = load_frame(fnam, index)
     
     #geom.plot_data(frame, ax = ax_im, vmax = 3)
-    frame_plot.set_data(geom.position_modules(frame)[0])
+    frame_plot.set_data(geom.position_modules(frame)[0]**0.2)
     fig_im.canvas.draw()
     fig_im.canvas.flush_events()
     #ax_im.draw()
@@ -151,7 +159,7 @@ pickle.dump((runs, photons), open(out_pickle, 'wb'))
 
 # plot
 fig, ax = plt.subplots(1, 1)
-fig.set_size_inches(10, 5)
+fig.set_size_inches(30, 8)
 fig.set_tight_layout(True)
 
 artists = []
@@ -167,9 +175,22 @@ if display_background :
         v = [back_line[i] for i in r]
     ax.scatter(r, v, alpha=0.6, c = 'k', s=3.0, label='background')
 
+# discard low signal
+ylim = ax.get_ylim()
+ax.set_ylim([50, ylim[1]])
+
 # add vlines when beam was refined
 ylim = ax.get_ylim()
-ax.vlines([111, 197, 285, 333, 371, 404], ylim[0], ylim[1], label='focus refinement', color='k', linestyle='--')
+ax.vlines(focus_refined, ylim[0], ylim[1], label='focus refinement', color='k', linestyle='--')
+
+
+# colour areas where no He was used
+label = 'no He'
+for i, j in no_he :
+    ax.fill_between([i, j], 0, 1, 
+                    color='grey', alpha=0.2, transform=ax.get_xaxis_transform(), label=label)
+    label = None
+
 
 ax.legend(markerscale=5)
 ax.set_yscale('log')
@@ -185,11 +206,14 @@ else :
     ax.set_ylabel('photon counts')
 ax.set_title(f"scatter plot of photon counts near optical axis for sizes: {int(1e9 * size_min)} to {int(1e9 * size_max)} nm\nbackground subtraction = {subtract_background}\npulse energy normalisation = {normalise_pulse_energy}", fontsize=12)
 
+# For the minor ticks, use no labels; default NullFormatter.
+ax.xaxis.set_minor_locator(MultipleLocator(10))
+
 fig.canvas.callbacks.connect('pick_event', on_pick)
 ax.grid(visible=True, which='both', alpha = 0.3)
-#plt.savefig(out)
 fig.show()
 
+plt.savefig(out)
 plt.show()
             
 
