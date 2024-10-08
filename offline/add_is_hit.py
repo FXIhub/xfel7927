@@ -22,16 +22,16 @@ from tqdm import tqdm
 
 for run in args.run :
     events_fnam = f'{PREFIX}/scratch/events/r{run:>04}_events.h5'
-
+    
     # Get hit indices
     def gaussian(x, a, x0, sigma):
         return a * np.exp(-(x-x0)**2 / 2 / sigma**2)
-
+    
     def get_hits_misses(hitscore, offset = 10):
         hy, hx = np.histogram(hitscore, np.arange(0, hitscore.max()+1, 1))
         xmax   = hy[offset:].argmax() + offset # Ignoring first few bins
         hymax  = hy[xmax]
-
+        
         m = (hitscore > offset) * (hitscore < (2*xmax - offset))
         sig = np.std(hitscore[m])
         
@@ -39,10 +39,11 @@ for run in args.run :
 
         mean, sig = popt[1], popt[2]
 
-        # thresholds for miss -3 to 0 sigma from mean
-        miss_thresh_max = mean 
-        miss_thresh_min = mean - 3*np.abs(sig)
-
+        # thresholds for miss -3 to +3 sigma from mean
+        t = args.hit_score_threshold_sigma - 1
+        miss_thresh_max = mean + t*np.abs(sig)
+        miss_thresh_min = mean - t*np.abs(sig)
+        
         # thresholds for hit
         hit_thresh_min = mean + np.abs(args.hit_score_threshold_sigma * sig)
         hit_thresh_max = np.inf
@@ -55,7 +56,7 @@ for run in args.run :
         is_miss = (hitscore > miss_thresh_min) * (hitscore < miss_thresh_max)
         
         return is_hit, is_miss
-
+    
     def get_hits_misses_simple(hitscore, offset=10):
         m = (hitscore > offset) * (hitscore < hitscore.max())
            
@@ -86,8 +87,8 @@ for run in args.run :
     if not args.per_train :
         is_hit, is_miss = get_hits_misses(hitscore)
     else :
-        # determine per N-events
-        N = 352 
+        # determine per N-events (1s)
+        N = 10 * 352 
         
         is_hit  = np.zeros(hitscore.shape[0], dtype = bool)
         is_miss = np.zeros(hitscore.shape[0], dtype = bool)
