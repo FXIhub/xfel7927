@@ -2,7 +2,7 @@ import argparse
 from constants import PREFIX, DET_DIST, FRAME_SHAPE, VDS_DATASET, VDS_MASK_DATASET
 import common
 
-parser = argparse.ArgumentParser(description='Calculate average background from misses and add to a cxi file')
+parser = argparse.ArgumentParser(description='Calculate average background from non-hits and add to a cxi file')
 parser.add_argument('run', type=int, help='Run number')
 
 args = parser.parse_args()
@@ -37,7 +37,8 @@ h5ls r0035_events.h5
 print(f'loading miss selection from {args.events_file}')
 with h5py.File(args.events_file) as f:
     # indices for definite miss
-    m = f['is_miss'][()]
+    #m = f['is_miss'][()]
+    m = ~f['is_hit'][()]
     indices = np.where(m)[0]
     
     cellId_lit    = f['cellId'][:]
