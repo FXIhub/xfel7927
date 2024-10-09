@@ -39,8 +39,5 @@ python add_pulsedata.py \${run}
 # add is_hit
 python add_is_hit.py \${run} -t 3 --per_train
 
-# add background
-python add_background_cxi.py \${run} 
-
 echo events done
 EOT
