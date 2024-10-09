@@ -187,7 +187,7 @@ print('Copying IDs from VDS file')
 sys.stdout.flush()
 with h5py.File(vds_file, 'r') as f_vds:
     trainId = f_vds['entry_1/trainId'][:]
-    cellId  = f_vds['entry_1/cellId'][:]
+    cellId  = f_vds['entry_1/cellId'][:, 0]
     pulseId = f_vds['entry_1/pulseId'][:]
 
 with h5py.File(out_fname, 'a') as f:

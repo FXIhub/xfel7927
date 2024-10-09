@@ -31,13 +31,15 @@ set -e
 
 run=\${SLURM_ARRAY_TASK_ID}
 
-python make_events_file.py \${run} -n 32 --masks r0551_mask.h5 hit_finding_mask.h5
+#python make_events_file.py \${run} -n 32 
+python make_events_file_proc.py \${run} 
 
 # add pulse energy
 python add_pulsedata.py \${run}
 
 # add is_hit
-python add_is_hit.py \${run} -t 4 --per_train
+#python add_is_hit.py \${run} -t 5 --per_train
+python add_is_hit_proc.py \${run} -t 5 --modules 15
 
 echo events done
 EOT

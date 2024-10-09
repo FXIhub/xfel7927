@@ -8,6 +8,7 @@ parser.add_argument('-s', '--sample_name',
                     help='name of sample',
                     type=str, default='DNA Pointer')
 parser.add_argument('-m', '--mask', type=str, default='r0065_mask.h5', help=f'filename of global good pixels mask, located in {PREFIX}/scratch/det/')
+parser.add_argument('-n', '--nproc', type=int, default=16, help=f'number of processes to use')
 
 args = parser.parse_args()
     
@@ -72,8 +73,14 @@ with h5py.File(args.events_file) as f:
     # indices for definite miss
     m = f['is_miss'][()]
     indices_miss = np.where(m)[0]
+        
+    if len(f['cellId'].shape) == 2 :
+        cellId_lit    = f['cellId'][:, 0]
+    elif len(f['cellId'].shape) == 1 :
+        cellId_lit    = f['cellId'][:]
+    else :
+        raise ValueError(f'unknown cellId shape in {args.events_file}')
     
-    cellId_lit    = f['cellId'][:]
     trainId_lit   = f['trainId'][()]
     pulseId_lit   = f['pulseId'][()]
 
@@ -86,6 +93,11 @@ with h5py.File(args.events_file) as f:
         hitscore    = f['hit_score'][()]
     else :
         hitscore    = None
+
+    if 'hit_sigma' in f :
+        hit_sigma    = f['hit_sigma'][()]
+    else :
+        hit_sigma    = None
 
 print(wavelength.shape)
 photon_energy = sc.h * sc.c / wavelength
@@ -166,6 +178,10 @@ with h5py.File(args.output_file, 'w') as f:
     if hitscore is not None :
         detector_1.create_dataset("hit_score",   data = hitscore[indices].astype(np.float32), compression='gzip', compression_opts=1, shuffle=True, chunks = True)
         detector_1['hit_score'].attrs['axes'] = "experiment_identifier"
+
+    if hit_sigma is not None :
+        detector_1.create_dataset("hit_sigma",   data = hit_sigma[indices].astype(np.float32), compression='gzip', compression_opts=1, shuffle=True, chunks = True)
+        detector_1['hit_sigma'].attrs['axes'] = "experiment_identifier"
     
     # write pixel map
     detector_1.create_dataset('xyz_map', data = xyz, compression='gzip', compression_opts=1, shuffle = True, dtype = np.float32)
@@ -208,7 +224,7 @@ with h5py.File(args.output_file, 'w') as f:
     f["entry_1/data_1/data"] = h5py.SoftLink('/entry_1/instrument_1/detector_1/data')
 
 #size = mp.cpu_count()
-size = 16
+size = args.nproc
 
 # split frames over ranks
 events_rank = np.linspace(0, Nevents, size+1).astype(int)
