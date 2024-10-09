@@ -45,7 +45,7 @@ class SLURM_status():
     def is_running(self, job_name, run):
         self.update_slurm()
         
-        job_string = f'*{job_name}-{EXP_ID}* * {run} *'
+        job_string = f'*{job_name}-{EXP_ID}* {run} *'
         
         # is job running?   
         match = fnmatch.filter(self.slurm_jobs, job_string)
