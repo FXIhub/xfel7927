@@ -24,13 +24,20 @@ display_background = True
 
 # just before refinement
 # + 0.5 so that we do not overlap with scatter
-focus_refined = np.array([111, 197, 285, 333, 371, 404, 413, 436, 456, 468, 494, 500, 536]) + 0.5
+focus_refined = np.array([0, 3, 104, 110, 192, 196, 285, 311, 336, 371, 405, 414, 436, 456, 483, 494, 536, 571, 585, 613]) + 0.5
 
 # where He was not used inclusive
 no_he = [[1, 72], [111, 124], [221, 234], [336, 348], [484, 495]]
 
 
 out = f'{PREFIX}/scratch/log/peak_intensity_report.pdf'
+if subtract_background and normalise_pulse_energy :
+    out = f'{PREFIX}/scratch/log/peak_intensity_report_back_pulse.pdf'
+elif subtract_background :
+    out = f'{PREFIX}/scratch/log/peak_intensity_report_back.pdf'
+elif normalise_pulse_energy :
+    out = f'{PREFIX}/scratch/log/peak_intensity_report_pulse.pdf'
+
 out_pickle = f'{PREFIX}/scratch/log/peak_intensity_report.pickle'
 
 # load hit_finding mask
@@ -85,7 +92,7 @@ for fnam in tqdm(fnams):
 
             
             if len(ds) > 0 :
-                print(fnam)
+                #print(fnam)
                 name = f['entry_1/sample_1/name'][()].decode('utf-8')
                  
                 key = '/entry_1/instrument_1/detector_1/hit_score'
@@ -176,20 +183,30 @@ for name in runs.keys():
     artists[-1].name = name
 
 if display_background :
-    r = back_line.keys()
+    
+    if subtract_background :
+        for r, b in back_line.items():
+            if b is not None :
+                back_line[r] = 0
+
     if normalise_pulse_energy :
-        v = [back_line[i]/(3e3 * average_pulse_energy[i]) if back_line[i] is not None else None for i in r]
-    else :
-        v = [back_line[i] for i in r]
+        for r, b in back_line.items():
+            if b is not None :
+                back_line[r] = b/(3e3 * average_pulse_energy[r])
+        
+    r = back_line.keys()
+    v = [back_line[i] for i in r]
     ax.scatter(r, v, alpha=0.6, c = 'k', s=3.0, label='background')
 
 # discard low signal
 ylim = ax.get_ylim()
-ax.set_ylim([50, ylim[1]])
+
+if subtract_background is False and normalise_pulse_energy is False :
+    ax.set_ylim([50, ylim[1]])
 
 # add vlines when beam was refined
 ylim = ax.get_ylim()
-ax.vlines(focus_refined, ylim[0], ylim[1], label='focus refinement', color='k', linestyle='--')
+ax.vlines(focus_refined, ylim[0], ylim[1], label='focus refinement', color='k', linestyle='--', alpha = 0.4)
 
 
 # colour areas where no He was used
@@ -200,7 +217,7 @@ for i, j in no_he :
     label = None
 
 
-ax.legend(markerscale=5)
+ax.legend(markerscale=5, loc='upper left')
 ax.set_yscale('log')
 ax.spines[['right', 'top']].set_visible(False)
 ax.set_xlabel('run number')
