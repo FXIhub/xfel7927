@@ -72,8 +72,14 @@ with h5py.File(args.events_file) as f:
     # indices for definite miss
     m = f['is_miss'][()]
     indices_miss = np.where(m)[0]
+        
+    if len(f['cellId'].shape) == 2 :
+        cellId_lit    = f['cellId'][:, 0]
+    elif len(f['cellId'].shape) == 1 :
+        cellId_lit    = f['cellId'][:]
+    else :
+        raise ValueError(f'unknown cellId shape in {args.events_file}')
     
-    cellId_lit    = f['cellId'][:]
     trainId_lit   = f['trainId'][()]
     pulseId_lit   = f['pulseId'][()]
 
