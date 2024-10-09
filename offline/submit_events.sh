@@ -37,7 +37,7 @@ python make_events_file.py \${run} -n 32 --masks r0551_mask.h5 hit_finding_mask.
 python add_pulsedata.py \${run}
 
 # add is_hit
-python add_is_hit.py \${run} -t 3 --per_train
+python add_is_hit.py \${run} -t 4 --per_train
 
 echo events done
 EOT
