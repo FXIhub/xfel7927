@@ -41,7 +41,13 @@ with h5py.File(args.events_file) as f:
     m = ~f['is_hit'][()]
     indices = np.where(m)[0]
     
-    cellId_lit    = f['cellId'][:]
+    if len(f['cellId'].shape) == 2 :
+        cellId_lit    = f['cellId'][:, 0]
+    elif len(f['cellId'].shape) == 1 :
+        cellId_lit    = f['cellId'][:]
+    else :
+        raise ValueError(f'unknown cellId shape in {args.events_file}')
+
     trainId_lit   = f['trainId'][()]
     pulseId_lit   = f['pulseId'][()]
 
