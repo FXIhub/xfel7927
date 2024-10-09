@@ -74,4 +74,4 @@ def intensity(run, run_table):
     command = f". {script_dir}/submit_intensity.sh {run}"
     return run_script, command
 
-scripts = [vds, events, cxi, static_emc, sizing, intensity]
+scripts = [vds, events, cxi, sizing]
