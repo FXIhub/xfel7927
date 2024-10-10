@@ -412,12 +412,13 @@ class Run_table():
                 frames =  trains * pulses
 
                 # I believe it gets converted to % and rounded by google
-                hit_rate = hits/frames
+                hit_rate = round(100 * hits/frames, 3)
             else :
                 hit_rate = None
+            
             run_dict[run_number]['Hit Rate'] = hit_rate
             
-            #row[i] = hit_rate
+            row[i] = hit_rate
 
         #for row in run_table :
         #    print(row)
