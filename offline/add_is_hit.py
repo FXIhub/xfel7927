@@ -30,6 +30,7 @@ import h5py
 import numpy as np
 import utils
 from constants import PREFIX
+import os
 
 sigma_threshold  = args.hit_score_threshold_sigma
 
