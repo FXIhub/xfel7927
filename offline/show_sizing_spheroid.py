@@ -64,22 +64,23 @@ class Comparison_array():
         self.sl   = sl
         self.qmap = qmap
         self.corr = solid * pol
+        self.mask = mask
     
     def get_image(self, ar, a, c, u, v):
         # get image of data = geometry correction then zero cropping
-        data_im = self.geom.position_modules(ar/np.sum(ar))[0][self.sl]
+        data_im = self.geom.position_modules(ar.astype(float))[0][self.sl]
         
         # image of fit
-        fit_full = sizing_spheroid.make_spheroid_profile(a, c, u, v, self.qmap)
+        fit_full = sizing_spheroid.make_spheroid_profile(a, c, u, v, self.qmap)**2
         
         # solid angle and polarisation correction
-        fit_full *= np.sqrt(self.corr)
+        fit_full *= self.corr
         
         # normalise amplitude
-        fit_full /= np.sum(fit_full**2)**0.5
+        fit_full *= np.sum(ar[self.mask]) / np.sum(fit_full[~self.background])
           
         # now merge images
-        data_im[self.background] = fit_full[self.background]**2
+        data_im[self.background] = fit_full[self.background]
         
         # mask r optional
         #r = (x**2 + y**2)**0.5
@@ -93,14 +94,14 @@ class Comparison_array():
 # matplotlib show them in a grid
 
 if __name__ == '__main__':
-    cxi_file = '/home/andyofmelbourne/Documents/2024/p7076/scratch/saved_hits/r0044_hits.cxi'
+    cxi_file = '/home/andyofmelbourne/Documents/2024/p7927/scratch/saved_hits/r0437_hits.cxi'
 
     with h5py.File(cxi_file) as f:
         xyz  = f['/entry_1/instrument_1/detector_1/xyz_map'][()]
         mask = f['/entry_1/instrument_1/detector_1/good_pixels'][()]
         wav  = np.mean(f['/entry_1/instrument_1/source_1/photon_wavelength'][()])
     
-    geom_file = '../geom/r0035_powder.geom'
+    geom_file = '../geom/r0063.geom'
     min_rad = 0
     max_rad = 0.02
     
@@ -129,7 +130,7 @@ if __name__ == '__main__':
             # why -v !!!???
             im = comp.get_image(frames[i], a[i]/2, c[i]/2, u[i], -v[i])
             
-            ax.imshow(im**0.2)
+            ax.imshow(im**0.5, vmax = 4**0.5)
             ax.set_axis_off()
             
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.7)
