@@ -31,3 +31,7 @@ def get(fnam = 'credentials_mdc.json'):
     #all_proposal_runs = MetadataClient.get_proposal_runs(client_comm, proposal_number)
     #print(json.dumps(all_proposal_runs, indent=2))
     return client_comm
+
+
+if __name__ == '__main__':
+    get()
