@@ -40,13 +40,14 @@ sigma_threshold  = args.hit_score_threshold_sigma
 # can have a low hitscore due to bad cell readings
 # can't think of a good way to automate
 minimum_hitscore = 20
+minimum_std      = 5
 
 for run in args.run :
     fnam = f'{PREFIX}/scratch/events/r{run:>04}_events.h5'
     #fnam = '/home/andyofmelbourne/Documents/2024/p7927/scratch/events/r0427_events.h5'
     
     if not os.path.exists(fnam) and len(args.run) > 0 :
-        print('WARNING {fnam} does not exist, skipping run {run}')
+        print(f'WARNING {fnam} does not exist, skipping run {run}')
         continue
 
     with h5py.File(fnam) as f:
@@ -74,7 +75,7 @@ for run in args.run :
         std = 1.4826 * (med - np.percentile(h, 25))
         hits = h > (med + sigma_threshold * std)
         
-        if med > minimum_hitscore :
+        if med > minimum_hitscore and std > minimum_std :
             is_hit[m]    = hits
             hit_sig[m]   = (h - med)/std
             threshold[m] = (med + sigma_threshold * std)
