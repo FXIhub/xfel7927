@@ -25,7 +25,8 @@ MASK_PATH = 'entry_1/instrument_1/detector_1/good_pixels'
 
 def parse_cmdline_args():
     parser = argparse.ArgumentParser(description='view shots from saved hits in cxi files')
-    parser.add_argument('cxi', type=int, help="run number of the cxi file.")
+    parser.add_argument('--run', type=int, help="run number of the cxi file.")
+    parser.add_argument('--cxi', type=str, help="file name of the cxi file (in saved_hits).")
     parser.add_argument('-l', '--litpixels', action='store_true', help="use litpixels to sort events.")
     parser.add_argument('-m', '--apply_mask', action='store_true', help="zero bad pixels before display")
     return parser.parse_args()
@@ -148,8 +149,11 @@ class Application(QtWidgets.QMainWindow):
             self.replot_frame()
         
 args = parse_cmdline_args()
-args.run  = args.cxi
-args.cxi  = PREFIX+'/scratch/saved_hits/r%.4d_hits.cxi'%args.cxi
+
+if args.run :
+    args.cxi  = PREFIX+'/scratch/saved_hits/r%.4d_hits.cxi'%args.run
+else :
+    args.cxi  = f'{PREFIX}/scratch/saved_hits/{args.cxi}'
 
 
 with h5py.File(args.cxi) as f:
@@ -170,7 +174,9 @@ else :
 
 if args.litpixels :
     #with h5py.File(args.cxi) as f:
-    if '/entry_1/instrument_1/detector_1/hit_score' in f :
+    if '/entry_1/instrument_1/detector_1/hit_sigma' in f :
+        litpixels = f['/entry_1/instrument_1/detector_1/hit_sigma'][()]
+    elif '/entry_1/instrument_1/detector_1/hit_score' in f :
         litpixels = f['/entry_1/instrument_1/detector_1/hit_score'][()]
     else :
         litpixels = f['/entry_1/instrument_1/detector_1/lit_pixels'][()]
