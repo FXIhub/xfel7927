@@ -36,7 +36,8 @@ class SLURM_status():
         
     def update_slurm(self):
         t = time.time()
-        if self.last_updated is None or (t-self.last_updated) < self.update_every :
+        if self.last_updated is None or (t-self.last_updated) > self.update_every :
+            print('updating slurm list')
             jobs = subprocess.run('squeue --Format="Name:30,ArrayTaskID:30"', shell=True, check=True, text=True, stdout=subprocess.PIPE)
             jobs = jobs.stdout.split('\n')
             self.slurm_jobs = jobs
@@ -50,6 +51,9 @@ class SLURM_status():
         # is job running?   
         match = fnmatch.filter(self.slurm_jobs, job_string)
         running = len(match) > 0
+        
+        if job_name == 'events':
+            print('slurm:', job_name, run, running, job_string)
 
         return running
 

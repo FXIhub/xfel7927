@@ -173,7 +173,7 @@ def get_cxi_file_status(run, slurm_status, log_status, file_status):
     # check if it is running
     is_running = slurm_status.is_running(job_name, run)
 
-    print(run, 'cxi is running', is_running)
+    #print(run, 'cxi is running', is_running)
     
     if is_running :
         out = 'running'
@@ -184,7 +184,7 @@ def get_cxi_file_status(run, slurm_status, log_status, file_status):
         # check files
         files_ok = file_status.check_files(job_name, run)
 
-        print(run, job_name, is_log_file, files_ok)
+        #print(run, job_name, is_log_file, files_ok)
         
         if is_log_file :
             if files_ok and log_success :
