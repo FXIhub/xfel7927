@@ -32,9 +32,9 @@ class bin_masked_array():
             
             # unbin
             bin_labels = -np.ones(mask.shape, dtype = int)
-            for i in range(4):
-                for j in range(4):
-                    bin_labels[..., i::4, j::4] = bin_labels_binned
+            for i in range(N):
+                for j in range(N):
+                    bin_labels[..., i::N, j::N] = bin_labels_binned
             
             # masked bin labels
             self.bin_labels_masked = bin_labels[mask]
