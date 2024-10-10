@@ -41,7 +41,7 @@ sigma_threshold  = args.hit_score_threshold_sigma
 # can't think of a good way to automate
 minimum_hitscore     = 20
 minimum_std          = 5
-minimum_pulse_energy = 1.5e-3
+minimum_pulse_energy = 1.0e-3
 
 for run in args.run :
     fnam = f'{PREFIX}/scratch/events/r{run:>04}_events.h5'
@@ -77,9 +77,10 @@ for run in args.run :
         std = 1.4826 * (med - np.percentile(h, 25))
         hits = h > (med + sigma_threshold * std)
 
+        # this is zero if we don't have data
         pe_train = np.mean(pulse_energy[m])
         
-        if med > minimum_hitscore and std > minimum_std and pe_train > minimum_pulse_energy:
+        if med > minimum_hitscore and std > minimum_std and pe_train > 0 and pe_train > minimum_pulse_energy:
             is_hit[m]    = hits
             hit_sig[m]   = (h - med)/std
             threshold[m] = (med + sigma_threshold * std)
@@ -103,10 +104,10 @@ for run in args.run :
         
     out = {'is_hit': is_hit, 'is_miss': is_miss, 'hit_sigma': hit_sig}
     
-    #print('writing to', fnam)
-    #with h5py.File(fnam, 'a') as f:
-    #    for k, v in out.items():
-    #        utils.update_h5(f, k, v, compression=True)
+    print('writing to', fnam)
+    with h5py.File(fnam, 'a') as f:
+        for k, v in out.items():
+            utils.update_h5(f, k, v, compression=True)
 
 """
 import pyqtgraph as pg
@@ -122,4 +123,4 @@ plot.plot(threshold, pen=pg.mkPen('g'))
     
 hist = np.bincount(hitscore)
 plot = pg.plot(hist)
-""
+"""
