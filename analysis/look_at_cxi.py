@@ -37,7 +37,7 @@ def clip_scalar(val, vmin, vmax):
 
 
 class Application(QtWidgets.QMainWindow):
-    def __init__(self, powder, data, mask, geom, sorted_indices, litpix):
+    def __init__(self, powder, data, mask, geom, sorted_indices, litpix, long, short):
         super().__init__()
         self.Z = data.shape[0]
         self.frame_index = -999
@@ -49,6 +49,8 @@ class Application(QtWidgets.QMainWindow):
         self.z_mask = mask
 
         self.litpix = litpix
+        self.long = long
+        self.short = short
          
         self.data = np.empty(np.squeeze(data[0]).shape, dtype=np.float32)
 
@@ -111,7 +113,7 @@ class Application(QtWidgets.QMainWindow):
                 self.frame_index = i
                 j = self.sorted_indices[self.frame_index]
                 
-                print('sorted index', i, 'file index', j, 'litpixels', self.litpix[i], self.data.dtype)
+                print('sorted index', i, 'file index', j, 'litpixels', self.litpix[i], 'short diam', round(1e9 * self.short[i]),'long diam', round(1e9 * self.long[i]))
                 
                 if self.frame_index >= 0 :
                     self.data[:] = np.squeeze(self.z_data[j] * self.z_mask)
@@ -189,6 +191,11 @@ else :
     sort = False
 
 
+long  = f['/entry_1/sizing/long_axis_diameter'][()]
+short = f['/entry_1/sizing/short_axis_diameter'][()]
+long  = long[sorted_indices]
+short = short[sorted_indices]
+
 
 geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)
 
@@ -196,7 +203,7 @@ geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)
 signal.signal(signal.SIGINT, signal.SIG_DFL) # allow Control-C
 app = QtWidgets.QApplication([])
     
-a = Application(powder, data, mask, geom, sorted_indices, litpix)
+a = Application(powder, data, mask, geom, sorted_indices, litpix, long, short)
 a.show()
 
 ## Start the Qt event loop

@@ -6,7 +6,6 @@ import os
 
 from constants import PREFIX
 
-#cxi_out = f'{PREFIX}/scratch/saved_hits/Ery_size_filtered.cxi'
 cxi_out = f'{PREFIX}/scratch/saved_hits/Ery_strong.cxi'
 runs = range(642)
 max_frames  = 1e10
@@ -24,15 +23,15 @@ for run in runs :
 
 def cxi_filter(f):
     h = f['/entry_1/instrument_1/detector_1/hit_sigma'][()]
-    #l0 = f['/entry_1/sizing/long_axis_diameter'][()]
-    #s0 = f['/entry_1/sizing/short_axis_diameter'][()]
-    #l  = np.where(s0 < l0, l0, s0)
-    #s  = np.where(s0 < l0, s0, l0)
+    l0 = f['/entry_1/sizing/long_axis_diameter'][()]
+    s0 = f['/entry_1/sizing/short_axis_diameter'][()]
+    l  = np.where(s0 < l0, l0, s0)
+    s  = np.where(s0 < l0, s0, l0)
 
-    # long axis has to be 25nm +- error
-    # short axis (in projection) can be anywhere between 15-25nm +- error
-    #out = (l >= 20e-9) * (l <= 30e-9) * (s >= 10e-9) * (s <= 30e-9) * (h > 20.)
-    out = (h > 200.)
+    # long axis has to be 32nm +- error
+    # short axis (in projection) can be anywhere between 15-32nm +- error
+    out = (l >= 20e-9) * (l <= 35e-9) * (s >= 10e-9) * (s <= 35e-9) * (h > 20.)
+    #out = (h > 200.)
     return out
         
 

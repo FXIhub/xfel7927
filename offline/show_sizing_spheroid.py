@@ -94,7 +94,7 @@ class Comparison_array():
 # matplotlib show them in a grid
 
 if __name__ == '__main__':
-    cxi_file = '/home/andyofmelbourne/Documents/2024/p7927/scratch/saved_hits/r0437_hits.cxi'
+    cxi_file = '/home/andyofmelbourne/Documents/2024/p7927/scratch/saved_hits/Ery_strong.cxi'
 
     with h5py.File(cxi_file) as f:
         xyz  = f['/entry_1/instrument_1/detector_1/xyz_map'][()]
@@ -118,14 +118,15 @@ if __name__ == '__main__':
         u = f['/entry_1/sizing/theta_x']
         v = f['/entry_1/sizing/theta_z']
             
-        counts = f['/entry_1/instrument_1/detector_1/photon_counts'][()]
+        #counts = f['/entry_1/instrument_1/detector_1/photon_counts'][()]
+        counts = f['/entry_1/instrument_1/detector_1/hit_sigma'][()]
         
         for i in np.argsort(counts)[::-1]:
             fig, ax = plt.subplots(1, 1)
             fig.set_tight_layout(True)
             fig.set_size_inches(4, 4)
     
-            print(a[i], c[i], u[i], v[i])
+            print(round(1e9 * a[i]), round(1e9 * c[i]), u[i], v[i])
                 
             # why -v !!!???
             im = comp.get_image(frames[i], a[i]/2, c[i]/2, u[i], -v[i])
