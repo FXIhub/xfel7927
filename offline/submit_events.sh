@@ -15,7 +15,7 @@ sbatch <<EOT
 #!/bin/bash
 
 #SBATCH --array=${1}
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --export=ALL
 #SBATCH -J events-${EXP_ID}
 #SBATCH -o ${EXP_PREFIX}/scratch/log/events-${EXP_ID}-%A-%a.out
