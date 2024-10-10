@@ -38,7 +38,7 @@ run=\${SLURM_ARRAY_TASK_ID}
 echo ${1} run = \${run} 
 
 #mpirun -n 32 python add_sizing_cxi.py \${run} --N_sizes 32 --N_angles 32
-python add_sizing_cxi.py \${run} --N_sizes 32 --N_angles 32
+python add_sizing_cxi.py \${run} --N_sizes 64 --N_angles 64
 
 echo sizing done
 EOT
