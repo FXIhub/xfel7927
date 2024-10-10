@@ -13,12 +13,12 @@ import signal
 
 import extra_geom
 
-#from constants import PREFIX
+from constants import PREFIX
 
 # for (much faster) local viewing
 #PREFIX='/home/andyofmelbourne/Documents/2024/p7076'
-PREFIX='/gpfs/exfel/exp/SPB/202405/p007927'
-geom_fnam='/gpfs/exfel/exp/SPB/202405/p007927/usr/Shared/amorgan/xfel7927/geom/r0120.geom'
+#PREFIX='/gpfs/exfel/exp/SPB/202405/p007927'
+geom_fnam=f'../geom/r0120.geom'
 
 DATA_PATH = 'entry_1/instrument_1/detector_1/data'
 MASK_PATH = 'entry_1/instrument_1/detector_1/good_pixels'
@@ -156,7 +156,7 @@ with h5py.File(args.cxi) as f:
     xyz = f['/entry_1/instrument_1/detector_1/xyz_map'][()]
 
     # also load powder
-    powder = f['/entry_1/instrument_1/detector_1/background'][()]
+    powder = f['/entry_1/instrument_1/detector_1/powder'][()]
 
 
 f = h5py.File(args.cxi)
