@@ -60,6 +60,27 @@ output = out + '/data.cxi'
 # returns everything except frames
 #data = utils.write_data_file(output, config['data'], config['model_length'], config['sampling'], config['max_frames'], config['frame_slice'], config['filter_by'], config['filter_value'])
 
+
+# add some datasets to the cxi file for this script to work
+for fnam in config['data'] :
+    with h5py.File(fnam, 'r+') as f:
+        key1 = '/entry_1/instrument_1/detector_1/good_pixels'
+        key2 = '/entry_1/instrument_1/detector_1/mask'
+        if key2 not in fnam :
+            f[key2] = f[key1][()]
+
+        key1 = '/entry_1/instrument_1/detector_1/xyz_map'
+        key2 = '/entry_1/instrument_1/detector_1/distance'
+        if key2 not in fnam :
+            f[key2] = np.mean(f[key1][2])
+
+        key1 = '/entry_1/instrument_1/source_1/pulse_energy'
+        key2 = '/entry_1/instrument_1/source_1/energy'
+        if key2 not in fnam :
+            f[key2] = np.mean(f[key1][()])
+
+
+
 # determine rmax and thus which pixels to select from config['data']
 with h5py.File(config['data'][0], 'r') as f:
     mask = f['/entry_1/instrument_1/detector_1/mask'][()]
