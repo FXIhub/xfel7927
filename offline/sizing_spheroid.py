@@ -233,6 +233,9 @@ class Sizing():
         
         # generate huge lookup table
         self.lookup = np.zeros((size, self.pixels), dtype = float)
+        
+        # for scaling
+        self.lookup2 = np.zeros((size, self.pixels), dtype = float)
 
         self.errs = np.zeros((size,), dtype = float)
         
@@ -244,6 +247,11 @@ class Sizing():
                     
                     # store for later
                     self.lookup[j] = p
+        
+                    # scale lookup for LL
+                    self.lookup2[j]  = p**2
+                    self.lookup2[j] /= np.sum(self.lookup2[j])
+                    
                     j += 1
         
         self.ac = ac
@@ -305,6 +313,38 @@ class Sizing():
         t    = self.binner.bin(t)
         
         np.sum((self.lookup - t)**2, axis=-1, out = self.errs)
+        imin = np.argmin(self.errs)
+        
+        i, j, k = np.unravel_index(imin, (self.ac.shape[0], self.u.shape[0], self.v.shape[0]))
+        ai, ci  = self.ac[i]
+        
+        if quadratic_refinement :
+            a, c, v = self.quadratic_refinement(ai, ci, i, j, k, imin)
+        else :
+            a = self.radii[ai]
+            c = self.radii[ci]
+            v = self.v[k]
+        
+        u = self.u[j]
+        self.imin = imin
+        
+        # return average diameter
+        return 2 * (2*a + c) / 3, a, c, u, v
+
+    def size_new(self, ar, quadratic_refinement = True):
+        # normalise
+        #t    = ar[self.mask]**0.5 / np.sum(ar[self.mask])**0.5
+        
+        # bin and mask
+        t    = self.binner.bin(ar[self.mask])
+        
+        #np.sum((self.lookup - t)**2, axis=-1, out = self.errs)
+        #imin = np.argmin(self.errs)
+        
+        #photons = np.sum(t)
+
+        # LL
+        np.sum(-t * np.log(self.lookup2), axis=-1, out = self.errs)
         imin = np.argmin(self.errs)
         
         i, j, k = np.unravel_index(imin, (self.ac.shape[0], self.u.shape[0], self.v.shape[0]))
