@@ -111,7 +111,7 @@ class Prob():
         seems to be pretty fast anyway...
         """
         # split frames by MPI rank
-        self.dchunk = 128
+        self.dchunk = 2048
         self.d_list, dstart, dstop = self.my_frames(rank, P.shape[0], self.dchunk)
         self.dstart = dstart
         self.dstop  = dstop

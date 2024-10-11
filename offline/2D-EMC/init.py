@@ -66,17 +66,17 @@ for fnam in config['data'] :
     with h5py.File(fnam, 'r+') as f:
         key1 = '/entry_1/instrument_1/detector_1/good_pixels'
         key2 = '/entry_1/instrument_1/detector_1/mask'
-        if key2 not in fnam :
+        if key2 not in f :
             f[key2] = f[key1][()]
 
         key1 = '/entry_1/instrument_1/detector_1/xyz_map'
         key2 = '/entry_1/instrument_1/detector_1/distance'
-        if key2 not in fnam :
+        if key2 not in f :
             f[key2] = np.mean(f[key1][2])
 
         key1 = '/entry_1/instrument_1/source_1/pulse_energy'
         key2 = '/entry_1/instrument_1/source_1/energy'
-        if key2 not in fnam :
+        if key2 not in f :
             f[key2] = np.mean(f[key1][()])
 
 
