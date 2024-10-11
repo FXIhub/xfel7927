@@ -41,7 +41,10 @@ config = utils.load_config(sys.argv[1])
 # make output directory
 if len(sys.argv) == 3 :
     out = sys.argv[2]
-    write_output = False
+    write_output = True
+    if not os.path.exists(out) :
+        print('creating reconstruction directory (can be renamed later)', out)
+        os.mkdir(out)
 else :
     write_output = True
     for n in range(1, 1000):

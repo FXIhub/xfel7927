@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# call: ./submit_cxi.sh <run_no> -s <sample name>
+# call: ./submit_cxi.sh <run_no> <sample name>
 # eg:   ./submit_events.sh 2 DNA
 
 source /etc/profile.d/modules.sh

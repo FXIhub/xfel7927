@@ -8,15 +8,16 @@ import runpy
 import h5py
 
 
-from mpi4py import MPI
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
-
-if rank == 0 :
+try :
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    if rank == 0 :
+        silent = False
+    else :
+        silent = True
+except ImportError :
     silent = False
-else :
-    silent = True
 
 def load_config(path):
     p = pathlib.Path(path)
@@ -286,14 +287,6 @@ def calculate_rotation_matrices(M):
     R[:, 1, 0] =  np.sin(t)
     R[:, 1, 1] =  np.cos(t)
     return R
-
-def allgather(array, axis):
-    for r in range(size):
-        indices = list(range(r, array.shape[axis], size))
-        s = len(array.shape) * [None,]
-        s[axis] = indices
-        s = tuple(s)
-        array[s] = comm.bcast(array[s], root=r)
 
 def expand(classes, points_I, I, W, xyz, R, C, minval = 1e-8):
     _, rotations, pixels = W.shape
