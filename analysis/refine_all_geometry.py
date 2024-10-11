@@ -13,7 +13,7 @@ s = 'quad_positions_r'
 
 def calculate(fnam):
     i = fnam.find(s) + len(s)
-    runs.append(int(fnam[i:i+4]))
+    run = int(fnam[i:i+4])
     
     command = f'python geometry_refinement_symmetry.py {fnam} {PREFIX}/scratch/det/r0551_mask.h5 ../geom/r{run:>4}.geom -z 715e-3 -d {dset} -q -o'
     
