@@ -2,15 +2,17 @@ import glob
 import subprocess
 from constants import PREFIX
 import h5py
+import multiprocessing
+
 
 # get all powders
 fnams = glob.glob(f'{PREFIX}/scratch/powder/*.h5')
 
 dset = '/powder'
 
-for fnam in fnams:
+def calculate(fnam):
     command = f'python geometry_refinement_symmetry.py {fnam} {PREFIX}/scratch/det/r0551_mask.h5 ../geom/r0600.geom -z 715e-3 -d {dset} -q -o'
-
+    
     with h5py.File(fnam) as f:
         if dset in f :
             run = True
@@ -20,4 +22,9 @@ for fnam in fnams:
     if run :
         print(f'running {command}')
         subprocess.run(command, shell=True, check=True, text=True)
+
+if __name__ == '__main__':
+    pool = multiprocessing.Pool(None)
+    r = pool.map_async(calculate, fnams)
+    r.wait() # Wait on the results
 
