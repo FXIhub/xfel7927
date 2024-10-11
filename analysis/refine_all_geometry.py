@@ -23,6 +23,8 @@ def calculate(fnam):
         else :
             run = False
 
+    print(fnam, run)
+
     if run :
         print(f'running {command}')
         subprocess.run(command, shell=True, check=True, text=True)
