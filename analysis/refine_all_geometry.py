@@ -9,9 +9,13 @@ import multiprocessing
 fnams = glob.glob(f'{PREFIX}/scratch/powder/*.h5')
 
 dset = '/powder'
+s = 'quad_positions_r'
 
 def calculate(fnam):
-    command = f'python geometry_refinement_symmetry.py {fnam} {PREFIX}/scratch/det/r0551_mask.h5 ../geom/r0600.geom -z 715e-3 -d {dset} -q -o'
+    i = fnam.find(s) + len(s)
+    runs.append(int(fnam[i:i+4]))
+    
+    command = f'python geometry_refinement_symmetry.py {fnam} {PREFIX}/scratch/det/r0551_mask.h5 ../geom/r{run:>4}.geom -z 715e-3 -d {dset} -q -o'
     
     with h5py.File(fnam) as f:
         if dset in f :
