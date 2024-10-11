@@ -9,7 +9,7 @@ import multiprocessing
 fnams = glob.glob(f'{PREFIX}/scratch/powder/*.h5')
 
 dset = '/powder'
-s = 'quad_positions_r'
+s = 'powder/r'
 
 def calculate(fnam):
     i = fnam.find(s) + len(s)
@@ -30,6 +30,7 @@ def calculate(fnam):
         subprocess.run(command, shell=True, check=True, text=True)
 
 if __name__ == '__main__':
+    print('hello')
     print(fnams)
     pool = multiprocessing.Pool(None)
     r = pool.map_async(calculate, fnams)
