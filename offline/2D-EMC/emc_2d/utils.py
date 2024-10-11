@@ -7,6 +7,7 @@ import pathlib
 import runpy
 import h5py
 
+np.random.seed(1)
 
 try :
     from mpi4py import MPI
@@ -26,6 +27,27 @@ def load_config(path):
     config = runpy.run_path(str(p.absolute()))
     
     return config
+
+def split_frame(frame, photons, N):
+    """
+    randomly place each photon in frame into one of N 
+    split frames
+    """
+    # the frame index for each photon
+    n = np.random.randint(0, N, photons)
+    
+    # the pixel location of each photon
+    loc  = np.searchsorted(np.cumsum(frame), np.arange(1, 1+photons))
+
+    # add the frame offset to each pixel location
+    #loc += n * frame.size
+    
+    out = np.zeros((N,) + frame.shape, dtype = frame.dtype)
+    
+    # put photons into out
+    np.add.at(out, (n, loc), 1)
+    return out
+    
 
 
 def plot_iter(recon_dir):
