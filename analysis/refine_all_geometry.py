@@ -30,6 +30,7 @@ def calculate(fnam):
         subprocess.run(command, shell=True, check=True, text=True)
 
 if __name__ == '__main__':
+    print(fnams)
     pool = multiprocessing.Pool(None)
     r = pool.map_async(calculate, fnams)
     r.wait() # Wait on the results
