@@ -6,6 +6,7 @@ import sys
 import pathlib
 import math
 import time
+from . import utils
 
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
@@ -303,12 +304,14 @@ class Update_W():
         P-sparsity...
     """
     
-    def __init__(self, w, I, b, B, P, inds, K, C, R, xyz, dx, pixel_chunk_size, minval = 1e-10, iters = 4, no_back = False):
+    def __init__(self, w, I, b, B, P, inds, K, C, R, xyz, dx, pixel_chunk_size, minval = 1e-10, iters = 4, no_back = False, inversion_symmetry = False):
         if not silent :
             print()
             print('initialising update_W routine')
-
+        
         self.no_back = np.int32(no_back)
+
+        self.inversion_symmetry = inversion_symmetry
         
         # split classes by MPI rank
         self.my_classes = np.arange(rank, I.shape[0], size)
@@ -471,9 +474,11 @@ class Update_W():
         self.Wsums    = comm.allreduce(self.Wsums)
         self.I[:]     = comm.allreduce(self.I)
         self.overlap2 = comm.allreduce(self.overlap2)
-
-        self.test1 = self.I.copy()
-        self.test2 = self.overlap2.copy()
+        
+        if self.inversion_symmetry :
+            for c in tqdm(range(self.classes), desc = 'enforcing inversion (Friedel) symmetry') :
+                self.overlap2[c] = utils.inversion_symmetry(self.overlap2[c])
+                self.I[c]        = utils.inversion_symmetry(self.I[c])
         
         self.overlap2[self.overlap2 <= 1e-20] = 1
         self.I /= self.overlap2

@@ -46,6 +46,13 @@ frames, classes, rotations = P.shape
 pixels                     = B.shape[-1]
 J                          = I.shape[1]
 
+k = 'inversion_symmetry' 
+if k in config and config[k] :
+    inversion_symmetry = True
+else :
+    inversion_symmetry = False
+    
+
 # load data (instead of bcast due to MPI size limit)
 for d in tqdm(range(1), desc = 'loading data'):
     with h5py.File(sys.argv[1] + '/data.cxi') as f:
@@ -79,13 +86,13 @@ for i in range(iteration, iteration + config['iters']):
         
     # Maximise + Compress
     # -------------------
-    cW = utils_cl.Update_W(w, I, b, B, P, inds, K, C, R, xyz, dx, pixels, minval = 1e-10, iters = iters, no_back = no_back)
+    cW = utils_cl.Update_W(w, I, b, B, P, inds, K, C, R, xyz, dx, pixels, minval = 1e-10, iters = iters, no_back = no_back, inversion_symmetry = inversion_symmetry)
     cW.update()
     Wsums = cW.Wsums.copy()
 
     cw = utils_cl.Update_w(Ksums, Wsums, P, w, I, b, B, inds, K, C, R, dx, xyz, iters, no_back)
     cw.update()
-    
+
     if update_b :
         print(cw.pixels)
         cb = utils_cl.Update_b(B, Ksums, cw)

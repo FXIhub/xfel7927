@@ -11,6 +11,7 @@ sampling           = 4
 model_length       = 64
 background_classes = 1
 max_frames         = 10**6
+inversion_symmetry = True
 #frame_shape        = (16, 128, 512)
 #frame_slice        = np.s_[:, :, :]
 #imshow             = lambda x: x[frame_slice]

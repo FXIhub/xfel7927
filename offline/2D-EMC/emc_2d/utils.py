@@ -28,6 +28,30 @@ def load_config(path):
     
     return config
 
+def inversion_symmetry(ar):
+    # must be cube 
+    assert(np.allclose(*ar.shape))
+    
+    # must be 3D
+    assert(len(ar.shape) == 2)
+    
+    N  = ar.shape[0]
+    
+    # assume fftshifted 
+    i0 = N//2
+    
+    if N % 2 == 0 :
+        i = np.fft.fftshift(np.fft.fftfreq(N-1, 1/(N-1)).astype(np.uint16))
+    else :
+        i = np.fft.fftshift(np.fft.fftfreq(N, 1/N).astype(np.uint16))
+    
+    i, j = np.meshgrid(i, i, indexing='ij')
+
+    out = ar.copy()
+
+    out[i+i0, j+i0] += out[-i+i0, -j+i0]
+    return out
+
 def split_frame(frame, photons, N):
     """
     randomly place each photon in frame into one of N 
