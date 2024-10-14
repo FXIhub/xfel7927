@@ -133,7 +133,6 @@ class Prob():
         
         self.LR_cl = cl.array.zeros(queue, (self.dchunk, classes, rotations), dtype = np.float32)
         self.w_cl  = cl.array.empty(queue, (frames,)   , dtype = np.float32)
-        self.I_cl  = cl.array.empty(queue, I.shape   , dtype = np.float32)
         self.b_cl  = cl.array.empty(queue, (frames,)   , dtype = np.float32)
         self.B_cl  = cl.array.empty(queue, (pixels,) , dtype = np.float32)
         self.C_cl  = cl.array.empty(queue, C.shape   , dtype = np.float32)
@@ -195,7 +194,7 @@ class Prob():
                     self.b_cl.data, self.B_cl.data, self.C_cl.data, self.R_cl.data, 
                     self.rx_cl.data, self.ry_cl.data,
                     self.beta, self.i0, self.dx, self.pixels, np.int32(d - self.dstart))
-             
+
             # offset in bytes for LR_cl
             cl.enqueue_copy(queue, dest = logR[d: d1], src = self.LR_cl.data)
 
