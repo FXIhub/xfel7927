@@ -41,6 +41,7 @@ with h5py.File(recon_fnam, 'r') as f:
     iteration = f['iterations/iters'][()]
     dx = f['model_voxel_size'][()]
 
+
 frames, classes, rotations = P.shape
 pixels                     = B.shape[-1]
 J                          = I.shape[1]
@@ -73,8 +74,9 @@ for i in range(iteration, iteration + config['iters']):
     c = utils_cl.Prob(C, R, inds, K, w, I, b, B, logR, P, xyz, dx, beta)
     expectation_value, log_likihood = c.calculate()
     if rank == 0 : print('expectation value: {:.6e}'.format(np.sum(P * logR) / beta))
-
     
+    assert(np.all(~np.isnan(logR)))
+        
     # Maximise + Compress
     # -------------------
     cW = utils_cl.Update_W(w, I, b, B, P, inds, K, C, R, xyz, dx, pixels, minval = 1e-10, iters = iters, no_back = no_back)
