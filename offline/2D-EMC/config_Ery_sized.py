@@ -5,12 +5,12 @@ PREFIX = os.environ['EXP_PREFIX']
 
 data = [f'{PREFIX}/scratch/saved_hits/Ery_size_filtered.cxi']
 
-classes            = 8
-rotations          = 32
+classes            = 64
+rotations          = 128
 sampling           = 4
-model_length       = 32
+model_length       = 64
 background_classes = 1
-max_frames         = 2048
+max_frames         = 10**6
 #frame_shape        = (16, 128, 512)
 #frame_slice        = np.s_[:, :, :]
 #imshow             = lambda x: x[frame_slice]
@@ -21,14 +21,14 @@ filter_value       = 100 # True
 dtype              = np.float32
 
 
-tol_P = 1e-2
+tol_P = 1e-3
 
-iters = 3
+iters = 100
 update_b = np.ones((iters,), dtype=bool)
 update_b[:] = False
 update_B = np.zeros((iters,), dtype=bool)
 betas = iters*[0.2]
 no_back = iters*[True]
-#beta_start = 0.001
-#beta_stop  = 0.01
-#betas = (beta_stop / beta_start)**(np.arange(iters)/(iters-1)) * beta_start
+beta_start = 0.001
+beta_stop  = 1
+betas = (beta_stop / beta_start)**(np.arange(iters)/(iters-1)) * beta_start
