@@ -19,8 +19,8 @@ sbatch <<EOT
 #SBATCH --time=010:00:00
 #SBATCH --export=ALL
 #SBATCH -J 2DEMC-${EXP_ID}
-#SBATCH -o ${EXP_PREFIX}/scratch/log/2DEMC-${EXP_ID}-%A-%a.out
-#SBATCH -e ${EXP_PREFIX}/scratch/log/2DEMC-${EXP_ID}-%A-%a.out
+#SBATCH -o ${EXP_PREFIX}/scratch/log/2DEMC-${EXP_ID}.out
+#SBATCH -e ${EXP_PREFIX}/scratch/log/2DEMC-${EXP_ID}.out
 ##SBATCH --partition=upex-beamtime
 ##SBATCH --reservation=upex_${EXP_ID}
 #SBATCH --constraint="GPUx4&A100"
@@ -29,7 +29,7 @@ sbatch <<EOT
 # exit on first error
 set -e
 
-./run_2D-EMC.sh \${1}
+./run_2D-EMC.sh ${1}
 
 echo 2DEMC done
 EOT
