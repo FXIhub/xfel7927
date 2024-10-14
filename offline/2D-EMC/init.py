@@ -124,10 +124,10 @@ points_I = (x.copy(), x.copy())
 if 'rmax' in config and config['rmax']:
     rmax = config['rmax']
 else :
-    rmax = x.max()
+    rmax = np.abs(x).max() - 2 * dx
 
 r = (xyz[0]**2 + xyz[1]**2)**0.5
-mask[r > rmax] = False
+mask[r >= rmax] = False
 
 
 # write meta data
@@ -147,6 +147,10 @@ with h5py.File(config['data'][0], 'r') as f:
     file_metadata = {}
     for d in datasets:
         v = f[d][()]
+
+        # override xyz_map
+        if hack and 'xyz_map' in d:
+            v = xyz.copy()
         
         # assume any dataset with frame shape as the last dimensions
         # need to be masked (including mask)
@@ -283,6 +287,7 @@ logR = np.zeros((number_of_frames, classes, rotations))
 P    = np.zeros((number_of_frames, classes, rotations))
 
 # float32
+print(f'writing reconstruction variables to: {recon_file}')
 with h5py.File(recon_file, 'w') as f:
     f['rotation_matrices'] = R.astype(dtype)
     f['models'] = I.astype(dtype)
