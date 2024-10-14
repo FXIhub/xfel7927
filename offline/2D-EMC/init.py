@@ -89,6 +89,27 @@ with h5py.File(config['data'][0], 'r') as f:
     mask = f['/entry_1/instrument_1/detector_1/mask'][()]
     xyz  = f['/entry_1/instrument_1/detector_1/xyz_map'][()]
     dx   = f['/entry_1/instrument_1/detector_1/x_pixel_size'][()]
+
+# hack to test effecct of geometry on classes
+hack = True
+if hack :
+    # offset from average of powder refinements
+    quads = np.array([[ -6.8, -10. ],
+           [ -7.1,   2.7],
+           [ -8.3,   3.9],
+           [  2.7,  -3.9]])
+    quads *= 200e-6 
+
+    xyz0 = xyz.copy()
+    for q in range(quads.shape[0]):
+        xyz[0, 4*q: 4*(q+1)] += quads[q, 0]
+        xyz[1, 4*q: 4*(q+1)] += quads[q, 1]
+    xyz[2] = 715e-3
+
+    # check
+    for d in range(0, 1, 2):
+        for m in range(16):
+            print(f'dimension {d} module {m} mean change (pixels) {np.mean(xyz[d, m] - xyz0[d, m])/200e-6}')
     
 # determine model voxel locations
 dx_model = dx * config['sampling']
