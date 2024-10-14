@@ -54,7 +54,10 @@ __kernel void calculate_LR (
         W = read_imagef(I, trilinear, coord);
         
         T = w[frame] * C[i] * W.x + b[frame] * B[i];
-        logR += K[pixels * Kindex + i] * log(T) - T ;
+        if (T > 0) 
+            logR += K[pixels * Kindex + i] * log(T) - T ;
+        //if ((Kindex == 0) && (class == 0) && (rotation == 0) && (i > 150) && (i < 200))
+        //    printf("%d %e\n", i, T);
     }
 
     LR[rotations * classes * Kindex + rotations * class + rotation] = beta * logR;
