@@ -91,7 +91,7 @@ with h5py.File(config['data'][0], 'r') as f:
     dx   = f['/entry_1/instrument_1/detector_1/x_pixel_size'][()]
 
 # hack to test effecct of geometry on classes
-hack = True
+hack = False
 if hack :
     # offset from average of powder refinements
     quads = np.array([[ -6.8, -10. ],
