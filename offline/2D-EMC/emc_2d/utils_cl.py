@@ -725,3 +725,115 @@ class Update_b():
         for r in range(size):
             r_ds, dstart, dstop = self.my_frames(r, self.P.shape[0], self.dchunk)
             self.b[dstart:dstop, 0] = comm.bcast(self.b[dstart: dstop, 0], root=r)
+
+
+
+
+
+class LL_per_pixel():
+    def __init__(self, C, R, inds, K, w, I, b, B, xyz, dx):
+        """
+        keep i on the slow axis to speed up the sum
+        
+         
+        but if we do it this way we have to calcuate the entire W for every frame (~5e5)
+        seems to be pretty fast anyway...
+        
+        Calculate log-likelihood for each pixel (summing over classes, frames, rotations)
+            T[i, t, r] = w[d] * W[i,t,r] + np.dot(b[d], B)[i]
+            logR[i] = ( sum_dtr ( K[d, i] log T[i, d, t, r] - T[i, d, t, r] ) )
+                      ( sum_d ( K[d, i] ( sum_tr log T[i, d, t, r] )- ( sum_tr T[i, d, t, r] ) ) )
+        
+        calculate T[i, d]    = sum_tr T[i, d, t, r]
+        
+        calculate logT[i, d] = sum_tr log T[i, d, t, r]
+        
+        calculate logR[i] = sum_d K[d, i] logT[d, i] - T[d, i]
+        """
+        # split frames by MPI rank
+        self.dchunk = 2048
+        self.d_list, dstart, dstop = self.my_frames(rank, w.shape[0], self.dchunk)
+        self.dstart = dstart
+        self.dstop  = dstop
+        
+        self.frames    = frames    = np.int32(dstop - dstart)
+        self.classes   = classes   = np.int32(I.shape[0])
+        self.rotations = rotations = np.int32(R.shape[0])
+        self.pixels    = pixels    = np.int32(B.shape[-1])
+         
+        self.dx   = np.float32(dx)
+        
+        self.i0 = np.float32(I.shape[-1] // 2)
+        
+        self.LR   = np.zeros((pixels,), dtype=np.float32)
+        self.logR = np.zeros((pixels,), dtype=np.float32)
+        self.inds = inds
+        self.K    = K
+        
+        self.LR_cl = cl.array.zeros(queue, (pixels,), dtype = np.float32)
+        self.w_cl  = cl.array.empty(queue, (frames,)   , dtype = np.float32)
+        self.b_cl  = cl.array.empty(queue, (frames,)   , dtype = np.float32)
+        self.B_cl  = cl.array.empty(queue, (pixels,) , dtype = np.float32)
+        self.C_cl  = cl.array.empty(queue, C.shape   , dtype = np.float32)
+        self.R_cl  = cl.array.empty(queue, R.shape   , dtype = np.float32)
+        self.rx_cl  = cl.array.empty(queue, xyz[0].shape   , dtype = np.float32)
+        self.ry_cl  = cl.array.empty(queue, xyz[1].shape   , dtype = np.float32)
+        
+        # load arrays to gpu
+        cl.enqueue_copy(queue, self.w_cl.data, w[dstart: dstop])
+        cl.enqueue_copy(queue, self.b_cl.data, b[dstart: dstop])
+        cl.enqueue_copy(queue, self.B_cl.data, B)
+        cl.enqueue_copy(queue, self.C_cl.data, C)
+        cl.enqueue_copy(queue, self.R_cl.data, R)
+        cl.enqueue_copy(queue, self.rx_cl.data, np.ascontiguousarray(xyz[0].astype(np.float32)))
+        cl.enqueue_copy(queue, self.ry_cl.data, np.ascontiguousarray(xyz[1].astype(np.float32)))
+        
+        # copy I as an opencl "image" for bilinear sampling
+        shape        = I.shape
+        image_format = cl.ImageFormat(cl.channel_order.R, cl.channel_type.FLOAT)
+        flags        = cl.mem_flags.READ_ONLY
+        self.I_cl    = cl.Image(context, flags, image_format, 
+                                shape = shape[::-1], is_array = True)
+        
+        cl.enqueue_copy(queue, dest = self.I_cl, src = I, 
+                        origin = (0, 0, 0), region = shape[::-1])
+
+    def my_frames(self, r, frames, chunk = 64):
+        ds = np.linspace(0, frames, size + 1).astype(int)
+        dstart = ds[:-1:][r]
+        dstop  = ds[1::][r]
+        my_ds = np.arange(dstart, dstop, chunk, dtype=np.int32)
+        return my_ds, dstart, dstop
+    
+    def calculate(self): 
+        if not silent :
+            print()
+        
+        logR = self.logR
+        self.K_cl  = cl.array.empty(queue, (self.dchunk, self.pixels,) , dtype = np.uint8)
+        K          = np.empty((self.dchunk, self.pixels,), dtype = np.uint8)
+        
+        for i_d, d in tqdm(enumerate(self.d_list), total = len(self.d_list), 
+                         desc = 'calculating logR matrix per pixel', disable = silent):
+            d1 = min(d+self.dchunk, self.dstop)
+            dd = d1 - d 
+            
+            # make dense K over frames chunk size
+            K.fill(0)
+            for i, di in enumerate(range(d, d1)):
+                K[i, self.inds[di]] = self.K[di]
+            cl.enqueue_copy(queue, self.K_cl.data, K)
+            
+            cl_code.calculate_LR_pixel(queue, (self.pixels,), None,
+                    self.I_cl, self.LR_cl.data, self.K_cl.data, self.w_cl.data, 
+                    self.b_cl.data, self.B_cl.data, self.C_cl.data, self.R_cl.data, 
+                    self.rx_cl.data, self.ry_cl.data,
+                    self.i0, self.dx, np.int32(dd), self.classes, self.rotations, np.int32(d - self.dstart))
+
+            cl.enqueue_copy(queue, dest = self.LR, src = self.LR_cl.data)
+
+            self.logR += self.LR
+            
+        self.logR = comm.allreduce(self.logR)
+        return self.logR
+    

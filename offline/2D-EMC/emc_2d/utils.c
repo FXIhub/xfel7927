@@ -64,6 +64,66 @@ __kernel void calculate_LR (
 }
 
 
+// T[i, d, t, r] = w[d] W[i, t, r] + b[d] B[i]
+// logR[i]       = sum_dtr K[i, d] log T[i, d, t, r] - T[i, d, t, r]
+
+__kernel void calculate_LR_pixel (
+    image2d_array_t I, 
+    global float *LR,  
+    global unsigned char *K, 
+    global float *w,
+    global float *b, 
+    global float *B, 
+    global float *C, 
+    global float *R, 
+    global float *rx, 
+    global float *ry, 
+    const float i0,
+    const float dx,
+    const int frames, 
+    const int classes, 
+    const int rotations, 
+    const int d0)
+{
+    int pixel  = get_global_id(0);
+    int pixels = get_global_size(0);
+
+        
+    float R_l[4];
+    float T;
+    float logR = 0.;
+    
+    int frame,class,rotation,i;
+
+    float4 coord ;
+    float4 W;
+    
+    for (rotation = 0; rotation < rotations; rotation++) {
+    
+        for (i=0; i<4; i++) {
+            R_l[i] = R[4*rotation + i];
+        }
+    
+    for (i = 0; i < frames; i++) {
+        frame = d0 + i;
+        
+    for (class = 0; class < classes; class++) {
+        
+        coord.z = class ;
+        coord.y = i0 + (R_l[0] * rx[pixel] + R_l[1] * ry[pixel]) / dx + 0.5;
+        coord.x = i0 + (R_l[2] * rx[pixel] + R_l[3] * ry[pixel]) / dx + 0.5;
+        
+        W = read_imagef(I, trilinear, coord);
+        
+        T = w[frame] * C[pixel] * W.x + b[frame] * B[pixel];
+        if (T > 0) 
+            logR += K[pixels * i + pixel] * log(T) - T ;
+    }}}
+
+    LR[pixel] = logR;
+}
+
+
 
 
 
