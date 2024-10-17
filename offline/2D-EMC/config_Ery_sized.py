@@ -5,7 +5,7 @@ PREFIX = os.environ['EXP_PREFIX']
 
 data = [f'{PREFIX}/scratch/saved_hits/Ery_size_filtered.cxi']
 
-classes            = 64
+classes            = 128
 rotations          = 128
 sampling           = 4
 model_length       = 64
@@ -29,7 +29,7 @@ update_b = np.ones((iters,), dtype=bool)
 update_b[:] = False
 update_B = np.zeros((iters,), dtype=bool)
 betas = iters*[0.2]
-no_back = iters*[True]
-beta_start = 0.001
+no_back = iters*[False]
+beta_start = 0.01
 beta_stop  = 1
 betas = (beta_stop / beta_start)**(np.arange(iters)/(iters-1)) * beta_start
