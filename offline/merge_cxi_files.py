@@ -3,36 +3,51 @@ import h5py
 import numpy as np
 from tqdm import tqdm
 import os
+import sys
+import pathlib
+import runpy
+
+def load_config(path):
+    p = pathlib.Path(path)
+    
+    # returns a dict
+    config = runpy.run_path(str(p.absolute()))
+    
+    return config
 
 from constants import PREFIX
 
-cxi_out = f'{PREFIX}/scratch/saved_hits/Ery_strong.cxi'
+#cxi_out = f'{PREFIX}/scratch/saved_hits/Ery_strong.cxi'
 runs = range(642)
 max_frames  = 1e10
 
+config     = load_config(sys.argv[1])
+cxi_in     = config['cxi_in']
+cxi_out    = config['cxi_out']
+cxi_filter = config['cxi_filter']
 
-cxi_in = []
-for run in runs :
-    fnam = PREFIX+'/scratch/saved_hits/r%.4d_hits.cxi'%run
-    if os.path.exists(fnam) :
-        with h5py.File(fnam) as f:
-            name = f['/entry_1/sample_1/name'][()].decode('utf-8')
-            if 'Ery' in name :
-                cxi_in.append(fnam)
+#cxi_in = []
+#for run in runs :
+#    fnam = PREFIX+'/scratch/saved_hits/r%.4d_hits.cxi'%run
+#    if os.path.exists(fnam) :
+#        with h5py.File(fnam) as f:
+#            name = f['/entry_1/sample_1/name'][()].decode('utf-8')
+#            if 'Ery' in name :
+#                cxi_in.append(fnam)
 
 
-def cxi_filter(f):
-    h = f['/entry_1/instrument_1/detector_1/hit_sigma'][()]
-    l0 = f['/entry_1/sizing/long_axis_diameter'][()]
-    s0 = f['/entry_1/sizing/short_axis_diameter'][()]
-    l  = np.where(s0 < l0, l0, s0)
-    s  = np.where(s0 < l0, s0, l0)
-
-    # long axis has to be 32nm +- error
-    # short axis (in projection) can be anywhere between 15-32nm +- error
-    out = (l >= 20e-9) * (l <= 35e-9) * (s >= 10e-9) * (s <= 35e-9) * (h > 20.)
-    #out = (h > 200.)
-    return out
+#def cxi_filter(f):
+#    h = f['/entry_1/instrument_1/detector_1/hit_sigma'][()]
+#    l0 = f['/entry_1/sizing/long_axis_diameter'][()]
+#    s0 = f['/entry_1/sizing/short_axis_diameter'][()]
+#    l  = np.where(s0 < l0, l0, s0)
+#    s  = np.where(s0 < l0, s0, l0)
+#
+#    # long axis has to be 32nm +- error
+#    # short axis (in projection) can be anywhere between 15-32nm +- error
+#    out = (l >= 20e-9) * (l <= 35e-9) * (s >= 10e-9) * (s <= 35e-9) * (h > 20.)
+#    #out = (h > 200.)
+#    return out
         
 
 
