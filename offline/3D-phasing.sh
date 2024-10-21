@@ -20,7 +20,7 @@ cd ${EXP_PREFIX}/scratch/3D-EMC/Ery
 emc_to_phasing_input.py < merged_intensity.pickle --beamstop 32 --cut_edges --soft_edges --size 300 -o intensity_phasing.pickle
 
 # phase intensity_phasing and produce output-phasing.pickle
-phase.py -s -b --no-centre --inversion_symmetry --shrink 1.5 0.5 200 --iters 1000DM 1000ERA 1000DM 1000ERA 1000DM 1000ERA < intensity_phasing.pickle > output-phasing.pickle
+phase.py -s -b --no-centre --inversion_symmetry --shrink 1.5 0.4 20 --iters 100DM 1000ERA 100DM 1000ERA 100DM 1000ERA < intensity_phasing.pickle > output-phasing.pickle
 
 python save_compressed_phase.py
 
