@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# need to run init_2D-EMC.sh first
-
 # call: ./submit_2D-EMC.sh <recon directory>
 # eg:   ./submit_2D-EMC.sh /gpfs/exfel/exp/SPB/202405/p007927/scratch/2D-EMC/Ery
 
