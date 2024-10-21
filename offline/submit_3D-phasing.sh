@@ -18,9 +18,9 @@ sbatch <<EOT
 
 #SBATCH --time=010:00:00
 #SBATCH --export=ALL
-#SBATCH -J 3DEMC-${EXP_ID}
-#SBATCH -o ${EXP_PREFIX}/scratch/log/3DEMC-${EXP_ID}.out
-#SBATCH -e ${EXP_PREFIX}/scratch/log/3DEMC-${EXP_ID}.out
+#SBATCH -J 3Dphasing-${EXP_ID}
+#SBATCH -o ${EXP_PREFIX}/scratch/log/3Dphasing-${EXP_ID}.out
+#SBATCH -e ${EXP_PREFIX}/scratch/log/3Dphasing-${EXP_ID}.out
 ##SBATCH --partition=upex-beamtime
 ##SBATCH --reservation=upex_${EXP_ID}
 #SBATCH --constraint="A100"
@@ -31,7 +31,7 @@ set -e
 
 ./3D-phasing.sh
 
-echo 3DEMC done
+echo 3Dphasing done
 EOT
 
 
