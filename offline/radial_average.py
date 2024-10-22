@@ -55,20 +55,9 @@ class Radial_average():
         return rsum
 
 
-# In[190]:
-
-
 r = Radial_average(xyz_map,mask,radial_bin_size,min_rad,max_rad)
 
-
-# In[191]:
-
-
 ave = r.make_rad_av(background)
-
-
-# In[192]:
-
 
 xaxis = np.linspace(min_rad,max_rad,ave.shape[0])
 ave_all_rings = np.sum(ave[5:-5])
