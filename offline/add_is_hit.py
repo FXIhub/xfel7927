@@ -62,6 +62,8 @@ for run in args.run :
     
     hit_sig = np.zeros((N,), dtype = float)
     is_hit  = np.zeros((N,), dtype = bool)
+    hit_med = np.zeros((N,), dtype = np.float32)
+    hit_std = np.zeros((N,), dtype = np.float32)
     is_miss = np.zeros((N,), dtype = bool)
     
     median     = np.zeros((N,), dtype = int)
@@ -79,6 +81,9 @@ for run in args.run :
 
         # this is zero if we don't have data
         pe_train = np.mean(pulse_energy[m])
+
+        hit_med[m] = med
+        hit_std[m] = std
         
         if med > minimum_hitscore and std > minimum_std and pe_train > 0 and pe_train > minimum_pulse_energy:
             is_hit[m]    = hits
@@ -102,7 +107,7 @@ for run in args.run :
     print(f'frames : {N :>10}')
     print()
         
-    out = {'is_hit': is_hit, 'is_miss': is_miss, 'hit_sigma': hit_sig}
+    out = {'is_hit': is_hit, 'is_miss': is_miss, 'hit_sigma': hit_sig, 'hit_median_train': hit_med, 'hit_std_train': hit_std}
     
     print('writing to', fnam)
     with h5py.File(fnam, 'a') as f:
