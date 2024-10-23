@@ -42,5 +42,8 @@ python add_is_hit.py \${run} -t 4 --per_train
 # add per frame photon counts
 python add_photon_counts.py \${run} -m r0551_mask.h5
 
+# calculate powder patterns for hits and non-hits
+python save_powder_hits_nonhits.py \${run} 
+
 echo events done
 EOT
