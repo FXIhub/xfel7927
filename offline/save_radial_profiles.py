@@ -137,9 +137,9 @@ class Calc_rad():
              
             # for testing
             #mask = self.mask
-
+            
             cids = f_vds['entry_1/cellId'][d]
-            vals = f_vds[VDS_DATASET][d]
+            vals = mask * f_vds[VDS_DATASET][d]
             
             np_radial_profiles[d] = self.ra.make_rad_av(vals)
             
