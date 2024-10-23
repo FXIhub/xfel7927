@@ -39,5 +39,8 @@ python add_pulsedata.py \${run}
 # add is_hit
 python add_is_hit.py \${run} -t 4 --per_train
 
+# add per frame photon counts
+python add_photon_counts.py \${run} -m r0551_mask.h5
+
 echo events done
 EOT
