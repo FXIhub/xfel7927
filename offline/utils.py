@@ -2,7 +2,7 @@ import numpy as np
 import h5py
 
     
-def update_h5(f, key, value, compression = False):
+def update_h5(f, key, value, compression = False, chunks = True):
     if key in f and f[key].shape != value.shape:
         del f[key]
         
