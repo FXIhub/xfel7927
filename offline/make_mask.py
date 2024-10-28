@@ -209,10 +209,10 @@ if __name__ == '__main__':
         mask[:, module] = module_mask
          
         # testing
-        m = np.sum(module_mask, axis=0) 
-        powder = np.sum(powder_cell * module_mask, axis = 0) / np.clip(m, 1, None)
-        p[module] = powder
-        print(p.dtype)
+        #m = np.sum(module_mask, axis=0) 
+        #powder = np.sum(powder_cell * module_mask, axis = 0) / np.clip(m, 1, None)
+        #p[module] = powder
+        #print(p.dtype)
     
     # output
     print(f'writing mask and cellids to {args.output}')
@@ -221,12 +221,12 @@ if __name__ == '__main__':
         utils.update_h5(f, 'entry_1/cellIds', cellIds, compression=True, chunks = cellIds.shape)
     
     # show powder
-    geom_fnam = common.get_geom(args.run)
-    import extra_geom
-    geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)
-    import pyqtgraph as pg
-    pg.show(geom.position_modules(p)[0])
+    #geom_fnam = common.get_geom(args.run)
+    #import extra_geom
+    #geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)
+    #import pyqtgraph as pg
+    #pg.show(geom.position_modules(p)[0])
     # allow Control-C
-    import signal
-    signal.signal(signal.SIGINT, signal.SIG_DFL) 
-    pg.exec()
+    #import signal
+    #signal.signal(signal.SIGINT, signal.SIG_DFL) 
+    #pg.exec()
