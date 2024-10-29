@@ -29,15 +29,18 @@ def get_module_fnams(run, module):
     return fnams
 
 def get_cell_ids(fnams, module):
-    fnam = fnams[0]
     src  = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{module}CH0:output/image/cellId'
-    with h5py.File(fnam) as f:
-        cellIds = np.unique(f[src][()])
-    
+    cs = []
+    for fnam in fnams:
+        with h5py.File(fnam) as f:
+            cs.append(np.unique(f[src][()]))
+    cellids = np.unique(np.concatenate(cs))
+
     print()
     print(f'found {len(cellIds)} unique cellIds:')
     print(cellIds)
     return cellIds
+
 
 
 class Powdersum():
@@ -125,11 +128,20 @@ def main():
         cellIdss.append(cellIds.copy())
         modules.append(module)
     
+    # make global powder allowing for missing cells
+    cellIds = np.unique(np.concatenate(cellIdss))
+    powderg = np.zeros((NMODULES,) + powder.shape, powder.dtype)
+    for ci, c in enumerate(cellIds):
+        for module in range(NMODULES):
+            cj = np.where(cellIdss[m] == c)[0]
+            if len(cj) == 1 :
+                powderg[m, c] = powderss[m][cj[0]]
+    
     print()
     print(f'writing output to {args.out}')
     with h5py.File(args.out, 'w') as f:
-        utils.update_h5(f, 'data', np.array(powders), compression = True, chunks = powder.shape)
-        utils.update_h5(f, 'cellIds', np.array(cellIdss), compression = True)
+        utils.update_h5(f, 'data', powderg, compression = True, chunks = powder.shape)
+        utils.update_h5(f, 'cellIds', cellIds, compression = True)
         utils.update_h5(f, 'events', np.array(eventss), compression = True)
         utils.update_h5(f, 'modules', np.array(modules), compression = True)
 
