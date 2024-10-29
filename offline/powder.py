@@ -34,7 +34,7 @@ def get_cell_ids(fnams, module):
     for fnam in fnams:
         with h5py.File(fnam) as f:
             cs.append(np.unique(f[src][()]))
-    cellids = np.unique(np.concatenate(cs))
+    cellIds = np.unique(np.concatenate(cs))
 
     print()
     print(f'found {len(cellIds)} unique cellIds:')
