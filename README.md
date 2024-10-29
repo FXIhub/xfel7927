@@ -15,13 +15,17 @@ Analysis files   : /gpfs/exfel/exp/SPB/202405/p007927/scratch/<user>/
 ```text
 XFEL Data (/raw)
    └► facility calibrations (/proc/r*/CORR*)           
-   └► VDS files (/scratch/vds/r*.cxi)
-      └► event info (/scratch/events/r*_events.h5)
-         └► cxi files for hits (/scratch/hits/r*_hits.cxi)
-            ├► static EMC (/scratch/emc_static/r*_emc_static.h5)
-            └► 2D EMC (/scratch/emc_2D/r*_emc_2D.h5)
-               └► classification (write to event info)
-                  └► 3D EMC (/scratch/emc_3D/r*_emc_3D.h5)
+   └► per-cell powder (/scratch/powder/r*_powder.h5)           
+     └► per-cell mask  (/scratch/det/r*_mask.h5)           
+        └► event info (/scratch/events/r*_events.h5)
+          └► per-cell per-cell powder hits non-hits (/scratch/powder/r*_powder.h5)
+            └► background estimation (events file)
+              └► cxi files for hits (/scratch/hits/r*_hits.cxi)
+                ├► sizing (cxi file)
+                ├► static EMC (/scratch/emc_static/r*_emc_static.h5)
+                └► 2D EMC (/scratch/emc_2D/r*_emc_2D.h5)
+                  └► classification (write to event info)
+                    └► 3D EMC (/scratch/emc_3D/r*_emc_3D.h5)
 ```
 
 ## Scripts
