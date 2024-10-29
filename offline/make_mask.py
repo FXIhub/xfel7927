@@ -31,7 +31,7 @@ def get_noise_cal(propno, runno, cellIds, module):
     
     # don't know if cellId's start at 0 or 1, I think 0
     # AGIPD03
-    s = agipd_cd['Noise'][f'AGIPD{module:>2}'].ndarray()
+    s = agipd_cd['Noise'][f'AGIPD{module:>02}'].ndarray()
     # (128, 512, 352, 3)
     gain = 0
     s = s[..., gain].transpose((2, 1, 0))
@@ -175,7 +175,7 @@ if __name__ == '__main__':
         print(f'processing module {module}')
         # get sigma
         #sig = get_noise_cal_testing(EXP_ID, args.run, cellIds, module)
-        sig = get_noise_cal(EXP_ID, args.run, cellIds)
+        sig = get_noise_cal(EXP_ID, args.run, cellIds, module)
         
         # mask sigma
         module_mask = make_sigma_mask(sig, args.std_sig_min, args.std_sig_max, args.max_bad_cells)
