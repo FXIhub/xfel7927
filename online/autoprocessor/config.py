@@ -74,4 +74,22 @@ def intensity(run, run_table):
     command = f". {script_dir}/submit_intensity.sh {run}"
     return run_script, command
 
-scripts = [vds, events, cxi, sizing]
+def mask(run, run_table):
+    run_script = False
+    if all(i not in run_table[run]['Mask'] for i in s):
+        if run_table[run]['Powder'] == 'ready':
+            run_script = True
+        
+    command = f". {script_dir}/submit_mask.sh {run}"
+    return run_script, command
+
+def powder(run, run_table):
+    run_script = False
+    if all(i not in run_table[run]['Powder'] for i in s):
+        if run_table[run]['Calib'] == 'ready':
+            run_script = True
+        
+    command = f". {script_dir}/submit_powder.sh {run}"
+    return run_script, command
+
+scripts = [vds, events, cxi, sizing, mask, powder]
