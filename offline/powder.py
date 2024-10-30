@@ -35,7 +35,7 @@ def get_cell_ids(fnams, module):
         with h5py.File(fnam) as f:
             cs.append(np.unique(f[src][()]))
     cellIds = np.unique(np.concatenate(cs))
-
+    
     print()
     print(f'found {len(cellIds)} unique cellIds:')
     print(cellIds)
@@ -52,10 +52,55 @@ def get_tid_cid_mapping_vds(tids, cids):
         tc_to_vds_index[tid][cid] = i
     return tc_to_vds_index
 
+def get_selection(select_events, run, out_folder):
+    if select_events :
+        assert(len(select_events) == 2)
+        
+        events   = f'{PREFIX}scratch/events/r{run:>04}_events.h5'
+        
+        # check that events file exists
+        assert(os.path.exists(events))
+        
+        print(f'finding events in {events} where {select_events[0]} = {select_events[1]}')
+        with h5py.File(events) as f:
+            select = f[select_events[0]][()] == eval(select_events[1])
+            tids = f['trainId'][()]
+            cids = f['cellId'][()]
+        
+        print(f'found {np.sum(select)} events to process')
+        
+        # get lookup table for trainId, cellIds -> vds index
+        tid_cid_mapping_vds = get_tid_cid_mapping_vds(tids, cids)
+
+        select_tid_cid = {}
+        for tid in tid_cid_mapping_vds.keys() :
+            select_tid_cid[tid] = {}
+            for cid in tid_cid_mapping_vds[tid].keys() :
+                i = tid_cid_mapping_vds[tid][cid]
+                if select[i] :
+                    select_tid_cid[tid][cid] = True
+                else :
+                    select_tid_cid[tid][cid] = False
+        
+        out = f'{out_folder}/r{run:>04}_powder_{select_events[0]}_{select_events[1]}.h5'
+    else :
+        # make a pretend nested dictionary
+        class A:
+            def __getitem__(self, i):
+                return True
+        class B:
+            def __getitem__(self, i):
+                return A()
+        select_tid_cid = B()
+ 
+        out = f'{out_folder}/r{run:>04}_powder.h5'
+
+    return select_tid_cid, out
+        
 
 
 class Powdersum():
-    def __init__(self, module, fnams, cellIds, mask, is_hit, tid_cid_mapping_vds, save_hit_powder):
+    def __init__(self, module, fnams, cellIds, select_tid_cid):
         # make inverse
         self.cid_to_index = {}
         for i, c in enumerate(cellIds) :
@@ -67,17 +112,7 @@ class Powdersum():
         self.powder_part = shmemarray.empty((len(fnams),) + (len(cellIds),) + MODULE_SHAPE, dtype = np.uint32)
         self.events_part = shmemarray.empty((len(fnams),) + (len(cellIds),)               , dtype = np.uint32)
         
-        if save_hit_powder :
-            self.powder_hit_part    = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
-            self.powder_nonhit_part = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
-            
-            self.overlap_hit_part    = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
-            self.overlap_nonhit_part = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
-        
-        self.mask = mask
-        self.is_hit = is_hit
-        self.tid_cid_mapping_vds = tid_cid_mapping_vds
-        self.save_hit_powder = save_hit_powder
+        self.select_tid_cid = select_tid_cid
 
     def run(self):
         pool = mp.Pool(len(self.fnams))
@@ -99,7 +134,7 @@ class Powdersum():
     
     def run_worker(self, proc):
         fnam = self.fnams[proc]
-
+        
         if proc == (len(self.fnams)-1) :
             disable = False
         else :
@@ -110,87 +145,50 @@ class Powdersum():
          
         data_src    = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/data'
         cellId_src  = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/cellId'
-        trainId_src = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/traiId'
+        trainId_src = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/trainId'
         with h5py.File(fnam) as f:
             data = f[data_src]
             cid  = f[cellId_src][()]
-            tid  = f[cellId_src][()]
+            tid  = f[trainId_src][()]
             
             frame = np.empty(MODULE_SHAPE, dtype = self.powder_part.dtype)
             
             for d in tqdm(range(data.shape[0]), disable = disable):
-                data.read_direct(frame, np.s_[d], np.s_[:])
-                i = self.cid_to_index[cid[d]]
-                self.powder_part[proc, i] += frame
-                self.events_part[proc, i] += 1
-                
-                if self.save_hit_powder :
-                    frame *= self.mask[cid[d]]
-                    is_hit = self.is_hit[self.tid_cid_mapping_vds[tid[d], cid[d]]]
-                    if is_hit :
-                        self.powder_hit_part[proc]  += frame
-                        self.overlap_hit_part[proc] += self.mask[cid[d]]
-                    else :
-                        self.powder_nonhit_part[proc]  += frame
-                        self.overlap_nonhit_part[proc] += self.mask[cid[d]]
+                process_event = self.select_tid_cid[tid][cid]
+                if process_event :
+                    data.read_direct(frame, np.s_[d], np.s_[:])
+                    i = self.cid_to_index[cid[d]]
+                    self.powder_part[proc, i] += frame
+                    self.events_part[proc, i] += 1
+                    
         return True
 
 
 def main():
     parser = argparse.ArgumentParser(description='calculate powder per cell')
     parser.add_argument('run', type=int, help='Run number')
-    parser.add_argument('-h', '--save_hit_powder', action='store_true', help='Use the hit label in the events file and the current run mask to calculate the per-pixel powder pattern for all hits and non-hits')
+    parser.add_argument('-s', '--select_events', nargs='+', type = str,
+                        help='The first argument is a dataset in the events file. The second argument is the flag to select e.g. "-s is_hit True" will calculate powder only for is_hit')
     parser.add_argument('-o', '--out_folder', 
                         help='Path of output folder (default=%s/scratch/powder/)'%PREFIX,
                         default=PREFIX+'/scratch/powder/')
     args = parser.parse_args()
-    args.out = f'{args.out_folder}/r{args.run:>04}_powder.h5'
+    #args.out = f'{args.out_folder}/r{args.run:>04}_powder.h5'
     
     powders  = []
     eventss  = []
     cellIdss = []
     modules  = []
-
-    if args.save_hit_powder :
-        args.run_mask = f'{PREFIX}scratch/det/r{args.run:>04}_mask.h5'
-        args.events   = f'{PREFIX}scratch/events/r{args.run:>04}_events.h5'
-        
-        # check that run mask file exists
-        assert(os.path.exists(args.run_mask))
-        assert(os.path.exists(args.events))
-
-        with h5py.File(args.events) as f:
-            is_hit = f['is_hit'][()]
-            tids = f['trainId'][()]
-            cids = f['cellId'][()]
-        
-        # get lookup table for trainId, cellIds -> vds index
-        tid_cid_mapping_vds = get_tid_cid_mapping_vds(tids, cids)
-        
-        powders_hits     = []
-        powders_nonhits  = []
-        eventss_hits     = []
-        eventss_nonhits  = []
-        
+    
+    select_tid_cid, out = get_selection(args.select_events, args.run, args.out_folder)
+    args.out = out
+    print(f'output filename {args.out}')
+    
     for module in range(NMODULES):
-        if args.save_hit_powder :
-            print(f'loading per-cell mask {args.run_mask} for module {module}')
-            with h5py.File(args.run_mask) as f:
-                cids = f['entry_1/cellIds'][()]
-                mask = {}
-                data = f['entry_1/good_pixels']
-                for i, c in enumerate(cids) :
-                    mask[c] = data[i, module]
-
-        else :
-            mask   = None
-            is_hit = None
-            tid_cid_mapping_vds = None
-        
         fnams   = get_module_fnams(args.run, module)
         cellIds = get_cell_ids(fnams, module)
         
-        powdersum = Powdersum(module, fnams, cellIds, mask, is_hit, tid_cid_mapping_vds, args.save_hit_powder)
+        powdersum = Powdersum(module, fnams, cellIds, select_tid_cid)
         
         powder, events = powdersum.run()
         
