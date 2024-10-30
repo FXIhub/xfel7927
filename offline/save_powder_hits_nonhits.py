@@ -84,7 +84,7 @@ class Powdersum():
         
         self.finish()
         
-        return self.powder_hits, self.powder_nonhits, self.overlap_hit, self.overlap_nonhit, self.Nhits, self.Nnonhits
+        return self.powder_hit, self.powder_nonhit, self.overlap_hit, self.overlap_nonhit, self.Nhits, self.Nnonhits
 
     def finish(self):
         self.powder_hit     = np.sum(self.powder_hit_part, axis=0)
@@ -102,34 +102,35 @@ class Powdersum():
         else :
             disable = True
         
-        self.powder_part[proc] = 0
-        self.events_part[proc] = 0
+        self.powder_hit_part[proc] = 0
+        self.powder_nonhit_part[proc] = 0
+        self.overlap_hit_part[proc] = 0
+        self.overlap_nonhit_part[proc] = 0
+        self.Nhits_part[proc] = 0
+        self.Nnonhits_part[proc] = 0
          
         data_src    = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/data'
         cellId_src  = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/cellId'
-        trainId_src = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/traiId'
+        trainId_src = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/trainId'
         with h5py.File(fnam) as f:
             data = f[data_src]
             cid  = f[cellId_src][()]
-            tid  = f[cellId_src][()]
+            tid  = f[trainId_src][()]
             
-            frame = np.empty(MODULE_SHAPE, dtype = self.powder_part.dtype)
+            frame = np.empty(MODULE_SHAPE, dtype = self.powder_hit_part.dtype)
             
             for d in tqdm(range(data.shape[0]), disable = disable):
                 data.read_direct(frame, np.s_[d], np.s_[:])
-                i = self.cid_to_index[cid[d]]
-                self.powder_part[proc, i] += frame
-                self.events_part[proc, i] += 1
-                
-                if self.save_hit_powder :
-                    frame *= self.mask[cid[d]]
-                    is_hit = self.is_hit[self.tid_cid_mapping_vds[tid[d], cid[d]]]
-                    if is_hit :
-                        self.powder_hit_part[proc]  += frame
-                        self.overlap_hit_part[proc] += self.mask[cid[d]]
-                    else :
-                        self.powder_nonhit_part[proc]  += frame
-                        self.overlap_nonhit_part[proc] += self.mask[cid[d]]
+                frame *= self.mask[cid[d]]
+                is_hit = self.is_hit[self.tid_cid_mapping_vds[tid[d]][cid[d]]]
+                if is_hit :
+                    self.powder_hit_part[proc]  += frame
+                    self.overlap_hit_part[proc] += self.mask[cid[d]]
+                    self.Nhits_part[proc]       += 1
+                else :
+                    self.powder_nonhit_part[proc]  += frame
+                    self.overlap_nonhit_part[proc] += self.mask[cid[d]]
+                    self.Nnonhits_part[proc]       += 1
         return True
 
 
@@ -185,7 +186,7 @@ def main():
         powders_nonhits.append(powder_nonhits.copy())
 
         overlaps_hits.append(overlap_hits.copy())
-        overlaps_nonhits.append(overlap_nonhits.copy())
+        overlaps_nonhits.append(overlap_non_hits.copy())
         
         events_hits.append(Nhits)
         events_nonhits.append(Nnonhits)
@@ -202,7 +203,11 @@ def main():
     p = np.array(powders_hits) + np.array(powders_nonhits)
     o = np.clip(np.array(overlaps_hits) + np.array(overlaps_nonhits), 1, None)
     mean_total = p / o
-    
+
+    events_hits = np.array(events_hits)
+    events_nonhits = np.array(events_nonhits)
+    events = events_hits + events_nonhits
+
     note = f"""
     hits are defined by 'is_hit' in the events file {args.events}
     per-cell mask is defined by 'entry_1/good_pixels' in the file {args.run_mask}
@@ -215,7 +220,9 @@ def main():
         utils.update_h5(f, 'powder_mean_nonhits', mean_nonhits, compression = True, chunks = mean_hits.shape)
         utils.update_h5(f, 'powder_mean_total',   mean_total,   compression = True, chunks = mean_hits.shape)
         
-        utils.update_h5(f, 'events', np.array(eventss), compression = True)
+        utils.update_h5(f, 'events', events, compression = True)
+        utils.update_h5(f, 'events_hits', events_hits, compression = True)
+        utils.update_h5(f, 'events_nonhits', events_nonhits, compression = True)
         utils.update_h5(f, 'modules', np.array(modules), compression = True)
          
         utils.update_h5(f, 'note', note, compression=False)

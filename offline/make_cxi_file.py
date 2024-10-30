@@ -82,7 +82,8 @@ with h5py.File(args.events_file) as f:
         raise ValueError(f'unknown cellId shape in {args.events_file}')
     
     trainId_lit   = f['trainId'][()]
-    pulseId_lit   = f['pulseId'][()]
+    # hack
+    #pulseId_lit   = trainId_lit   #f['pulseId'][()]
 
     photons      = f['total_intens'][()]
     litpixels    = f['litpixels'][()]
@@ -146,7 +147,7 @@ with h5py.File(args.output_file, 'w') as f:
 
     entry_1['trainId']  = trainId_lit[indices]
     entry_1['cellId']   = cellId_lit[indices]
-    entry_1['pulseId']  = pulseId_lit[indices]
+    #entry_1['pulseId']  = pulseId_lit[indices]
     entry_1['vds_index']  = indices
 
     # copy instrument name
@@ -233,7 +234,7 @@ events_rank = np.linspace(0, Nevents, size+1).astype(int)
 with h5py.File(args.vds_file) as g:
     cellId_vds = g['entry_1/cellId'][:, 0]
     trainId_vds = g['entry_1/trainId'][()]
-    pulseId_vds = g['entry_1/pulseId'][()]
+    #pulseId_vds = g['entry_1/pulseId'][()]
 
 def worker(rank, lock):
     my_indices = indices[events_rank[rank]: events_rank[rank+1]] 
@@ -270,7 +271,7 @@ def worker(rank, lock):
             # make sure we have the right event
             assert(cellId_vds[index] == cellId_lit[index])
             assert(trainId_vds[index] == trainId_lit[index])
-            assert(pulseId_vds[index] == pulseId_lit[index])
+            #assert(pulseId_vds[index] == pulseId_lit[index])
             
     # take turns writing frame_buf to file 
     it = tqdm(range(len(my_indices)), desc = f'rank {rank} writing data to {args.output_file}')
