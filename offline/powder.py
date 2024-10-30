@@ -133,9 +133,9 @@ def main():
     powderg = np.zeros((NMODULES,) + powder.shape, powder.dtype)
     for ci, c in enumerate(cellIds):
         for module in range(NMODULES):
-            cj = np.where(cellIdss[m] == c)[0]
+            cj = np.where(cellIdss[module] == c)[0]
             if len(cj) == 1 :
-                powderg[m, c] = powderss[m][cj[0]]
+                powderg[module, ci] = powders[module][cj[0]]
     
     print()
     print(f'writing output to {args.out}')
