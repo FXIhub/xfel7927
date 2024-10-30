@@ -55,29 +55,22 @@ def get_tid_cid_mapping_vds(tids, cids):
 
 
 class Powdersum():
-    def __init__(self, module, fnams, cellIds, mask, is_hit, tid_cid_mapping_vds, save_hit_powder):
-        # make inverse
-        self.cid_to_index = {}
-        for i, c in enumerate(cellIds) :
-            self.cid_to_index[c] = i
-        
+    def __init__(self, module, fnams, mask, is_hit, tid_cid_mapping_vds):
         self.fnams = fnams
         self.module = module
         
-        self.powder_part = shmemarray.empty((len(fnams),) + (len(cellIds),) + MODULE_SHAPE, dtype = np.uint32)
-        self.events_part = shmemarray.empty((len(fnams),) + (len(cellIds),)               , dtype = np.uint32)
+        self.powder_hit_part    = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
+        self.powder_nonhit_part = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
         
-        if save_hit_powder :
-            self.powder_hit_part    = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
-            self.powder_nonhit_part = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
-            
-            self.overlap_hit_part    = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
-            self.overlap_nonhit_part = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
+        self.overlap_hit_part    = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
+        self.overlap_nonhit_part = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
+
+        self.Nhits_part    = shmemarray.empty((len(fnams),), dtype = np.uint32)
+        self.Nnonhits_part = shmemarray.empty((len(fnams),), dtype = np.uint32)
         
         self.mask = mask
         self.is_hit = is_hit
         self.tid_cid_mapping_vds = tid_cid_mapping_vds
-        self.save_hit_powder = save_hit_powder
 
     def run(self):
         pool = mp.Pool(len(self.fnams))
@@ -88,14 +81,18 @@ class Powdersum():
         
         for r in result_iter:
             pass
-
+        
         self.finish()
-
-        return self.powder, self.events
+        
+        return self.powder_hits, self.powder_nonhits, self.overlap_hit, self.overlap_nonhit, self.Nhits, self.Nnonhits
 
     def finish(self):
-        self.powder = np.sum(self.powder_part, axis=0)
-        self.events = np.sum(self.events_part, axis=0)
+        self.powder_hit     = np.sum(self.powder_hit_part, axis=0)
+        self.powder_nonhit  = np.sum(self.powder_nonhit_part, axis=0)
+        self.overlap_hit    = np.sum(self.overlap_hit_part, axis=0)
+        self.overlap_nonhit = np.sum(self.overlap_nonhit_part, axis=0)
+        self.Nhits          = np.sum(self.Nhits_part, axis=0)
+        self.Nnonhits       = np.sum(self.Nnonhits_part, axis=0)
 
     def run_worker(self, proc):
         fnam = self.fnams[proc]
@@ -197,11 +194,11 @@ def main():
     p = np.array(powders_hits)
     o = np.clip(np.array(overlaps_hits), 1, None)
     mean_hits = p / o
-
+    
     p = np.array(powders_nonhits)
     o = np.clip(np.array(overlaps_nonhits), 1, None)
     mean_nonhits = p / o
-
+    
     p = np.array(powders_hits) + np.array(powders_nonhits)
     o = np.clip(np.array(overlaps_hits) + np.array(overlaps_nonhits), 1, None)
     mean_total = p / o
@@ -220,7 +217,7 @@ def main():
         
         utils.update_h5(f, 'events', np.array(eventss), compression = True)
         utils.update_h5(f, 'modules', np.array(modules), compression = True)
-
+         
         utils.update_h5(f, 'note', note, compression=False)
 
 if __name__ == '__main__':
