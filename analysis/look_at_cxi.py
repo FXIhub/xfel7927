@@ -18,7 +18,7 @@ from constants import PREFIX
 # for (much faster) local viewing
 #PREFIX='/home/andyofmelbourne/Documents/2024/p7076'
 #PREFIX='/gpfs/exfel/exp/SPB/202405/p007927'
-geom_fnam=f'../geom/r0120.geom'
+geom_fnam=f'../geom/r0600.geom'
 
 DATA_PATH = 'entry_1/instrument_1/detector_1/data'
 MASK_PATH = 'entry_1/instrument_1/detector_1/good_pixels'
@@ -62,6 +62,7 @@ class Application(QtWidgets.QMainWindow):
         self.geom = geom
         
         self.display = np.zeros(im.shape, dtype=np.float32)
+        self.display[:] = np.nan
           
         self.in_replot = False
         
@@ -191,10 +192,14 @@ else :
     sort = False
 
 
-long  = f['/entry_1/sizing/long_axis_diameter'][()]
-short = f['/entry_1/sizing/short_axis_diameter'][()]
-long  = long[sorted_indices]
-short = short[sorted_indices]
+if '/entry_1/sizing/long_axis_diameter' in f :
+    long  = f['/entry_1/sizing/long_axis_diameter'][()]
+    short = f['/entry_1/sizing/short_axis_diameter'][()]
+    long  = long[sorted_indices]
+    short = short[sorted_indices]
+else :
+    long  = np.zeros(len(sorted_indices,), dtype = float)
+    short  = np.zeros(len(sorted_indices,), dtype = float)
 
 
 geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)
