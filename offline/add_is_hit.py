@@ -52,7 +52,7 @@ for run in args.run :
         continue
 
     with h5py.File(fnam) as f:
-        hitscore     = np.rint(f['/total_intens'][()]).astype(int)
+        hitscore     = np.rint(f['/total_intens_mask'][()]).astype(int)
         trainIds     = f['trainId'][()]
         pulse_energy = f['pulse_energy'][()]
     

@@ -247,8 +247,8 @@ def main():
         utils.update_h5(f, 'litpixels',    litpixels_global, compression = True, chunks = litpixels_global.shape)
         utils.update_h5(f, 'total_intens_mask', photon_counts_mask_global, compression = True, chunks = photon_counts_mask_global.shape)
         utils.update_h5(f, 'litpixels_mask',    litpixels_mask_global, compression = True, chunks = litpixels_mask_global.shape)
-        utils.update_h5(f, 'cellIds', cellIds[0], compression = True)
-        utils.update_h5(f, 'trainIds', trainIds[0], compression = True)
+        utils.update_h5(f, 'cellId', cellIds[0], compression = True)
+        utils.update_h5(f, 'trainId', trainIds[0], compression = True)
         utils.update_h5(f, 'modules', np.array(modules), compression = True)
 
 if __name__ == '__main__':

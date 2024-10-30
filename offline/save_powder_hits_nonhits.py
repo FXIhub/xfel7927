@@ -1,182 +1,228 @@
-# doing this first speeds up running
+# use multiprocessing to calculate powder pattern
+# per module per cell 
+# use Egor's shmem thing (looks nice)
+# use mp.Pool
+
 import os
 import argparse
 
-if __name__ == '__main__':
-    PREFIX = os.environ["EXP_PREFIX"]
+import numpy as np
+import h5py
+import multiprocessing as mp
+import glob
+from pathlib import Path
+from tqdm import tqdm
+import utils
+import shmemarray
 
-    parser = argparse.ArgumentParser(description='calculate powder profiles for all hits and non hits')
+PREFIX = os.environ["EXP_PREFIX"]
+from constants import NMODULES, MODULE_SHAPE
+
+def get_module_fnams(run, module):
+    # get module file names
+    run_dir = f'{PREFIX}/proc/r{run:>04}/'
+    assert(Path(run_dir).is_dir())
+    
+    fnams = glob.glob(f'{run_dir}/CORR-*-AGIPD{module:>02}-S*.h5')
+    
+    print(f'found {len(fnams)} files for module {module}.')
+    return fnams
+
+def get_cell_ids(fnams, module):
+    src  = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{module}CH0:output/image/cellId'
+    cs = []
+    for fnam in fnams:
+        with h5py.File(fnam) as f:
+            cs.append(np.unique(f[src][()]))
+    cellIds = np.unique(np.concatenate(cs))
+
+    print()
+    print(f'found {len(cellIds)} unique cellIds:')
+    print(cellIds)
+    return cellIds
+
+def get_tid_cid_mapping_vds(tids, cids):
+    tc_to_vds_index = {}
+
+    # initialise lookup 
+    for t in np.unique(tids):
+        tc_to_vds_index[t] = {}
+    
+    for i, (tid, cid) in enumerate(zip(tids, cids)):
+        tc_to_vds_index[tid][cid] = i
+    return tc_to_vds_index
+
+
+
+class Powdersum():
+    def __init__(self, module, fnams, cellIds, mask, is_hit, tid_cid_mapping_vds, save_hit_powder):
+        # make inverse
+        self.cid_to_index = {}
+        for i, c in enumerate(cellIds) :
+            self.cid_to_index[c] = i
+        
+        self.fnams = fnams
+        self.module = module
+        
+        self.powder_part = shmemarray.empty((len(fnams),) + (len(cellIds),) + MODULE_SHAPE, dtype = np.uint32)
+        self.events_part = shmemarray.empty((len(fnams),) + (len(cellIds),)               , dtype = np.uint32)
+        
+        if save_hit_powder :
+            self.powder_hit_part    = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
+            self.powder_nonhit_part = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
+            
+            self.overlap_hit_part    = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
+            self.overlap_nonhit_part = shmemarray.empty((len(fnams),) + MODULE_SHAPE, dtype = np.uint32)
+        
+        self.mask = mask
+        self.is_hit = is_hit
+        self.tid_cid_mapping_vds = tid_cid_mapping_vds
+        self.save_hit_powder = save_hit_powder
+
+    def run(self):
+        pool = mp.Pool(len(self.fnams))
+        
+        result_iter = pool.imap_unordered(
+            self.run_worker, range(len(self.fnams))
+        )
+        
+        for r in result_iter:
+            pass
+
+        self.finish()
+
+        return self.powder, self.events
+
+    def finish(self):
+        self.powder = np.sum(self.powder_part, axis=0)
+        self.events = np.sum(self.events_part, axis=0)
+
+    def run_worker(self, proc):
+        fnam = self.fnams[proc]
+
+        if proc == (len(self.fnams)-1) :
+            disable = False
+        else :
+            disable = True
+        
+        self.powder_part[proc] = 0
+        self.events_part[proc] = 0
+         
+        data_src    = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/data'
+        cellId_src  = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/cellId'
+        trainId_src = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/traiId'
+        with h5py.File(fnam) as f:
+            data = f[data_src]
+            cid  = f[cellId_src][()]
+            tid  = f[cellId_src][()]
+            
+            frame = np.empty(MODULE_SHAPE, dtype = self.powder_part.dtype)
+            
+            for d in tqdm(range(data.shape[0]), disable = disable):
+                data.read_direct(frame, np.s_[d], np.s_[:])
+                i = self.cid_to_index[cid[d]]
+                self.powder_part[proc, i] += frame
+                self.events_part[proc, i] += 1
+                
+                if self.save_hit_powder :
+                    frame *= self.mask[cid[d]]
+                    is_hit = self.is_hit[self.tid_cid_mapping_vds[tid[d], cid[d]]]
+                    if is_hit :
+                        self.powder_hit_part[proc]  += frame
+                        self.overlap_hit_part[proc] += self.mask[cid[d]]
+                    else :
+                        self.powder_nonhit_part[proc]  += frame
+                        self.overlap_nonhit_part[proc] += self.mask[cid[d]]
+        return True
+
+
+def main():
+    parser = argparse.ArgumentParser(description='calculate per-pixel powder patter for all hits and all non-hits')
     parser.add_argument('run', type=int, help='Run number')
-    parser.add_argument('-n', '--nproc', 
-                        help='Number of processes to use',
-                        type=int, default=0)
     parser.add_argument('-o', '--out_folder', 
                         help='Path of output folder (default=%s/scratch/powder/)'%PREFIX,
                         default=PREFIX+'/scratch/powder/')
     args = parser.parse_args()
-    
-    vds_file     = PREFIX+'scratch/vds/r%.4d.cxi' %args.run
-    
-    # for testing
-    #vds_file     = PREFIX+'scratch/saved_hits/r%.4d_hits.cxi' %args.run
-    
-    events_fname      = args.out_folder + os.path.splitext(os.path.basename(vds_file))[0] + '_events.h5'
-    out_fname_hits    = args.out_folder + os.path.splitext(os.path.basename(vds_file))[0] + '_powder_hits.h5'
-    out_fname_misses  = args.out_folder + os.path.splitext(os.path.basename(vds_file))[0] + '_powder_misses.h5'
+    args.out  = f'{args.out_folder}/r{args.run:>04}_powder_hits.h5'
 
-import common
-from constants import DET_DIST, VDS_DATASET, VDS_MASK_DATASET
-import subprocess
-import numpy as np
-import h5py
-import ctypes
-import multiprocessing as mp
-import utils
-from pathlib import Path
-import extra_geom
-import sys
-import time
+    args.run_mask = f'{PREFIX}scratch/det/r{args.run:>04}_mask.h5'
+    args.events   = f'{PREFIX}scratch/events/r{args.run:>04}_events.h5'
 
+    # check that run mask and events file exists
+    assert(os.path.exists(args.run_mask))
+    assert(os.path.exists(args.events))
 
-class Calc_powder():
-    def __init__(self, vds_file, is_hit, is_miss, nproc=0):
-        self.vds_file = vds_file
-        if nproc == 0:
-            self.nproc = int(subprocess.check_output('nproc').decode().strip())
-        else:
-            self.nproc = nproc
-        print('Using %d processes' % self.nproc)
-        
-        with h5py.File(vds_file, 'r') as f:
-            self.dshape = f[VDS_DATASET].shape
-        
-        self.is_hit  = self.is_hit
-        self.is_miss = self.is_miss
-        
-        self.frames  = int(self.dshape[0])
-        self.modules = int(self.dshape[1])
-        self.pixels  = int(np.prod(self.dshape[2:]))
-        self.module_shape = self.dshape[2:]
-        self.frame_shape = self.dshape[1:]
-        
-    def run_frame(self):
-        sys.stdout.write('Calculating number of lit pixels for all modules for %d frames\n'%(self.frames))
-        sys.stdout.flush()
-        
-        # radial profile for each frame
-        overlap_hits   = mp.Array(ctypes.c_ulong, self.pixels)
-        overlap_misses = mp.Array(ctypes.c_ulong, self.pixels)
-        powder_hits    = mp.Array(ctypes.c_ulong, self.pixels)
-        powder_misses  = mp.Array(ctypes.c_ulong, self.pixels)
-        
-        jobs = []
-        for c in range(self.nproc):
-            p = mp.Process(target=self._part_worker, args=(c, powder_hits, powder_misses))
-            jobs.append(p)
-            p.start()
-        
-        for i, j in enumerate(jobs):
-            sys.stdout.write(f'\n\nwaiting for job {i} to finish... ')
-            sys.stdout.flush()
-            j.join()
-            sys.stdout.write(f'Done\n\n')
-            sys.stdout.flush()
-        
-        self.overlap_hits   = np.frombuffer(overlap_hits.get_obj(),   dtype='u8').reshape(self.frame_shape)
-        self.overlap_misses = np.frombuffer(overlap_misses.get_obj(), dtype='u8').reshape(self.frame_shape)
-        self.powder_hits   = np.frombuffer(powder_hits.get_obj(),   dtype='u8').reshape(self.frame_shape)
-        self.powder_misses = np.frombuffer(powder_misses.get_obj(), dtype='u8').reshape(self.frame_shape)
-        return self.powder_hits, self.powder_misses, self.overlap_hits, self.overlap_misses
+    with h5py.File(args.events) as f:
+        is_hit = f['is_hit'][()]
+        tids = f['trainId'][()]
+        cids = f['cellId'][()]
     
-    def _part_worker(self, p, powder_hits, powder_misses):
-        np_powder_hits   = np.frombuffer(powder_hits.get_obj(),   dtype='u8').reshape(self.frame_shape)
-        np_powder_misses = np.frombuffer(powder_misses.get_obj(), dtype='u8').reshape(self.frame_shape)
-        np_overlap_hits   = np.frombuffer(overlap_hits.get_obj(),   dtype='u8').reshape(self.frame_shape)
-        np_overlap_misses = np.frombuffer(overlap_misses.get_obj(), dtype='u8').reshape(self.frame_shape)
-        
-        nframes  = self.frames
-        my_start = (nframes // self.nproc) * p
-        my_end   = min((nframes // self.nproc) * (p+1), nframes)
-        Nevents  = my_end - my_start 
-        
-        stime = time.time()
-        f_vds = h5py.File(self.vds_file, 'r')
-        for d in range(my_start, my_end):
-            # read vds file (assume photon units)
-            mask = f_vds[VDS_MASK_DATASET][d] == 0
-             
-            cids = f_vds['entry_1/cellId'][d]
-            vals = mask * f_vds[VDS_DATASET][d]
-            
-            if self.is_hit[d] :
-                np_powder_hits  += vals
-                np_overlap_hits += mask
-            
-            if self.is_miss[d] :
-                np_powder_misses  += vals
-                np_overlap_misses += mask
-            
-            etime = time.time()
-            if p == 0:
-                sys.stdout.write('\r%.4d/%.4d: %.2f Hz' % (d+1, Nevents, (d+1)/(etime-stime)*self.nproc))
-                sys.stdout.flush()
-        f_vds.close()
-        if p == 0:
-            sys.stdout.write('\n')
-            sys.stdout.flush()
+    # get lookup table for trainId, cellIds -> vds index
+    tid_cid_mapping_vds = get_tid_cid_mapping_vds(tids, cids)
+    
+    powders_hits     = []
+    powders_nonhits  = []
+    overlaps_hits     = []
+    overlaps_nonhits     = []
+    events_hits  = []
+    events_nonhits  = []
+    
+    modules  = []
 
+    for module in range(NMODULES):
+        print(f'loading per-cell mask {args.run_mask} for module {module}')
+        with h5py.File(args.run_mask) as f:
+            cids = f['entry_1/cellIds'][()]
+            mask = {}
+            data = f['entry_1/good_pixels']
+            for i, c in enumerate(cids) :
+                mask[c] = data[i, module]
+
+        fnams   = get_module_fnams(args.run, module)
+        
+        powdersum = Powdersum(module, fnams, mask, is_hit, tid_cid_mapping_vds)
+        
+        powder_hits, powder_nonhits, overlap_hits, overlap_non_hits, Nhits, Nnonhits = powdersum.run()
+        
+        powders_hits.append(powder_hits.copy())
+        powders_nonhits.append(powder_nonhits.copy())
+
+        overlaps_hits.append(overlap_hits.copy())
+        overlaps_nonhits.append(overlap_nonhits.copy())
+        
+        events_hits.append(Nhits)
+        events_nonhits.append(Nnonhits)
+        modules.append(module)
+    
+    p = np.array(powders_hits)
+    o = np.clip(np.array(overlaps_hits), 1, None)
+    mean_hits = p / o
+
+    p = np.array(powders_nonhits)
+    o = np.clip(np.array(overlaps_nonhits), 1, None)
+    mean_nonhits = p / o
+
+    p = np.array(powders_hits) + np.array(powders_nonhits)
+    o = np.clip(np.array(overlaps_hits) + np.array(overlaps_nonhits), 1, None)
+    mean_total = p / o
+    
+    note = f"""
+    hits are defined by 'is_hit' in the events file {args.events}
+    per-cell mask is defined by 'entry_1/good_pixels' in the file {args.run_mask}
+    """
+    
+    print()
+    print(f'writing output to {args.out}')
+    with h5py.File(args.out, 'w') as f:
+        utils.update_h5(f, 'powder_mean_hits',    mean_hits,    compression = True, chunks = mean_hits.shape)
+        utils.update_h5(f, 'powder_mean_nonhits', mean_nonhits, compression = True, chunks = mean_hits.shape)
+        utils.update_h5(f, 'powder_mean_total',   mean_total,   compression = True, chunks = mean_hits.shape)
+        
+        utils.update_h5(f, 'events', np.array(eventss), compression = True)
+        utils.update_h5(f, 'modules', np.array(modules), compression = True)
+
+        utils.update_h5(f, 'note', note, compression=False)
 
 if __name__ == '__main__':
-    # check that vds file exists
-    d = Path(vds_file).resolve()
-    assert(d.is_file())
-    
-    # check that output directory exists
-    d = Path(out_fname_hits).resolve().parent
-    assert(d.is_dir())
-    
-    # check that output directory exists
-    d = Path(out_fname_misses).resolve().parent
-    assert(d.is_dir())
-    
-    # load is_hit from events file
-    with h5py.File(events_fname, 'r') as f:
-        is_hit       = f['is_hit'][()]
-        pulse_energy = f['pulse_energy'][()]
-        hit_sigma    = f['hit_sigma'][()]
-    
-    # let's call a miss anything with a hitsigma bw +- 2
-    sig_min = -2
-    sig_max = 2
-    is_miss = (hit_sigma > sig_min) * (hit_sigma < sig_max)
-    
-    m = pulse_energy > 0
-    av_pulse_energy_hits   = np.mean(pulse_energy[m * is_hit])
-    av_pulse_energy_misses = np.mean(pulse_energy[m * is_miss])
-    
-    calc_pow = Calc_powder(vds_file, is_hit, is_miss, nproc=args.nproc)
-    
-    powder_hits, powder_misses, overlap_hits, overlap_misses = calc_pow.run_frame()
-    
-    note_misses = f"""
-    Misses are defined to be any frame with: {sig_min} < hit_sigma < {sig_max}
-    """
-    
-    note_hits = f"""
-    hits are defined by 'is_hit' in the events file
-    """
-    
-    print(f'writing hits powder to {out_fname_hits}')
-    with h5py.File(out_fname_hits, 'a') as f:
-        utils.update_h5(f, 'powder_sum_hits', powder_hits, compression=True)
-        utils.update_h5(f, 'overlap', overlap_hits, compression=True)
-        utils.update_h5(f, 'is_hit', is_hit, compression=True)
-        utils.update_h5(f, 'note', note_hits, compression=False)
-
-    print(f'writing misses powder to {out_fname_misses}')
-    with h5py.File(out_fname_misses, 'a') as f:
-        utils.update_h5(f, 'powder_sum_misses', powder_hits, compression=True)
-        utils.update_h5(f, 'overlap', overlap_misses, compression=True)
-        utils.update_h5(f, 'is_miss', is_miss, compression=True)
-        utils.update_h5(f, 'note', note_misses, compression=False)
+    main()
 

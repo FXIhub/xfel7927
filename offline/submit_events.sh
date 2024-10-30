@@ -31,16 +31,13 @@ set -e
 
 run=\${SLURM_ARRAY_TASK_ID}
 
-python make_events_file.py \${run} -n 32 --masks r0551_mask.h5 hit_finding_mask.h5
+python make_events_file.py \${run} --hit_finding_mask hit_finding_mask.h5
 
 # add pulse energy
 python add_pulsedata.py \${run}
 
 # add is_hit
 python add_is_hit.py \${run} -t 4 --per_train
-
-# add per frame photon counts
-python add_photon_counts.py \${run} -m r0551_mask.h5
 
 # calculate powder patterns for hits and non-hits
 python save_powder_hits_nonhits.py \${run} 
