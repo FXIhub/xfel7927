@@ -92,4 +92,5 @@ def powder(run, run_table):
     command = f". {script_dir}/submit_powder.sh {run}"
     return run_script, command
 
-scripts = [vds, events, cxi, sizing, mask, powder]
+#scripts = [vds, events, cxi, sizing, mask, powder]
+scripts = [vds, events, sizing, mask, powder]

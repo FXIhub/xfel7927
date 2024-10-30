@@ -24,7 +24,7 @@ from constants import PREFIX, EXP_ID
 job_files = {'vds'    : [f'{PREFIX}/scratch/vds/rrun.cxi'], 
              'events' : [f'{PREFIX}/scratch/events/rrun_events.h5'], 
              'powder' : [f'{PREFIX}/scratch/powder/rrun_powder.h5'], 
-             'mask'   : [f'{PREFIX}/scratch/powder/rrun_mask.h5'], 
+             'mask'   : [f'{PREFIX}/scratch/det/rrun_mask.h5'], 
              'cxi'    : [f'{PREFIX}/scratch/saved_hits/rrun_hits.cxi', f'{PREFIX}/scratch/emc/rrun.emc'],
              'sizing' : [f'{PREFIX}/scratch/saved_hits/rrun_hits.cxi', f'{PREFIX}/scratch/events/rrun_events.h5'],
              'intensity' : [f'{PREFIX}/scratch/log/peak_intensity_report.pdf'],
@@ -54,8 +54,8 @@ class SLURM_status():
         match = fnmatch.filter(self.slurm_jobs, job_string)
         running = len(match) > 0
         
-        if job_name == 'events':
-            print('slurm:', job_name, run, running, job_string)
+        #if job_name == 'events':
+        #    print('slurm:', job_name, run, running, job_string)
 
         return running
 

@@ -306,12 +306,13 @@ def get_static_emc_file_status(run, slurm_status, log_status, file_status):
 
 def get_mask_file_status(run, slurm_status, log_status, file_status):
     job_name = 'mask'
-
+    
     if not running_on_maxwell :
         return None
         
     # check if it is running
     is_running = slurm_status.is_running(job_name, run)
+
     
     if is_running :
         out = 'running'
@@ -321,6 +322,8 @@ def get_mask_file_status(run, slurm_status, log_status, file_status):
 
         # check files
         files_ok = file_status.check_files(job_name, run)
+
+        print(f'mask: run = {run} is_running = {is_running}, is_log_file = {is_log_file}, log_success = {log_success}, files_ok = {files_ok}')
 
         if is_log_file :
             if files_ok and log_success :
