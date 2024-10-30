@@ -6,6 +6,7 @@ from tqdm import tqdm
 import os
 import utils
 import common
+import time
 
 from constants import PREFIX, EXP_ID, NMODULES, MODULE_SHAPE
 
@@ -27,7 +28,14 @@ def get_noise_cal(propno, runno, cellIds, module):
     gain_setting = int(run["SPB_IRU_AGIPD1M1/MDL/FPGA_COMP"].run_value("gain"))
     
     acond = AGIPDConditions(bias_voltage, ncell, acquisition_rate, gain_setting, gain_mode, source_energy, integration_time)
-    agipd_cd = CalibrationData.from_condition(acond, 'SPB_DET_AGIPD1M-1', event_at = run_date)
+
+    # this seems to randomly fail
+    for i in range(100):
+        try :
+            agipd_cd = CalibrationData.from_condition(acond, 'SPB_DET_AGIPD1M-1', event_at = run_date)
+            break
+        except :
+            time.sleep(1)
     
     # don't know if cellId's start at 0 or 1, I think 0
     # AGIPD03
@@ -193,8 +201,9 @@ if __name__ == '__main__':
         with h5py.File(args.powder) as f:
             cs     = f['cellIds'][module]
             for cellId in cellIds:
-                c = np.where(cellId == cs)[0][0]
-                powder_cell[c] = f['data'][module, c]
+                c = np.where(cellId == cs)[0]
+                if len(c) == 1 :
+                    powder_cell[c] = f['data'][module, c]
         
         module_mask *= make_powder_mask(powder_cell, args.std_powder_cell)
         print('powder mask % masked:', round(100*np.sum(~module_mask) / module_mask.size, 2), '%')
