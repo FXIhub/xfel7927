@@ -14,6 +14,7 @@ from pathlib import Path
 from tqdm import tqdm
 import utils
 import shmemarray
+import sys
 
 PREFIX = os.environ["EXP_PREFIX"]
 from constants import NMODULES, MODULE_SHAPE
@@ -36,8 +37,18 @@ def get_cell_ids(fnams, module):
             cs.append(np.unique(f[src][()]))
     cellIds = np.unique(np.concatenate(cs))
     
+    return cellIds
+
+def get_all_cell_ids(run):
+    cs = []
+    for module in range(NMODULES):
+        fnams = get_module_fnams(run, module)
+        cs.append(get_cell_ids(fnams, module))
+    
+    cellIds = np.unique(np.concatenate(cs))
+    
     print()
-    print(f'found {len(cellIds)} unique cellIds:')
+    print(f'found {len(cellIds)} unique cellIds for all modules:')
     print(cellIds)
     return cellIds
 
@@ -106,7 +117,7 @@ class Powdersum():
         for i, c in enumerate(cellIds) :
             self.cid_to_index[c] = i
         
-        self.fnams = fnams
+        self.fnams  = fnams
         self.module = module
         
         self.powder_part = shmemarray.empty((len(fnams),) + (len(cellIds),) + MODULE_SHAPE, dtype = np.uint32)
@@ -114,11 +125,16 @@ class Powdersum():
         
         self.select_tid_cid = select_tid_cid
 
-    def run(self):
+    def run(self, fnams, module):
+        self.fnams  = fnams
+        self.module = module
+        
+        assert(len(fnams)<= self.powder_part.shape[0])
+        
         pool = mp.Pool(len(self.fnams))
         
         result_iter = pool.imap_unordered(
-            self.run_worker, range(len(self.fnams))
+            self.run_worker, range(len(self.fnams)), chunksize=1
         )
         
         for r in result_iter:
@@ -127,12 +143,16 @@ class Powdersum():
         self.finish()
 
         return self.powder, self.events
-
+    
     def finish(self):
-        self.powder = np.sum(self.powder_part, axis=0)
-        self.events = np.sum(self.events_part, axis=0)
+        F = len(self.fnams)
+        self.powder = np.sum(self.powder_part[:F], axis=0)
+        self.events = np.sum(self.events_part[:F], axis=0)
     
     def run_worker(self, proc):
+        print(f'process {proc} starting')
+        sys.stdout.flush() 
+    
         fnam = self.fnams[proc]
         
         if proc == (len(self.fnams)-1) :
@@ -154,13 +174,17 @@ class Powdersum():
             frame = np.empty(MODULE_SHAPE, dtype = self.powder_part.dtype)
             
             for d in tqdm(range(data.shape[0]), disable = disable):
-                process_event = self.select_tid_cid[tid][cid]
+                t = tid[d]
+                c = cid[d]
+                process_event = self.select_tid_cid[t][c]
                 if process_event :
                     data.read_direct(frame, np.s_[d], np.s_[:])
-                    i = self.cid_to_index[cid[d]]
+                    i = self.cid_to_index[c]
                     self.powder_part[proc, i] += frame
                     self.events_part[proc, i] += 1
-                    
+        
+        print(f'process {proc} finished')
+        sys.stdout.flush() 
         return True
 
 
@@ -184,27 +208,23 @@ def main():
     args.out = out
     print(f'output filename {args.out}')
     
+    # get all cellIds
+    cellIds = get_all_cell_ids(args.run)
+    
     for module in range(NMODULES):
         fnams   = get_module_fnams(args.run, module)
-        cellIds = get_cell_ids(fnams, module)
         
-        powdersum = Powdersum(module, fnams, cellIds, select_tid_cid)
+        if module == 0:
+            powdersum = Powdersum(module, fnams, cellIds, select_tid_cid)
         
-        powder, events = powdersum.run()
+        powder, events = powdersum.run(fnams, module)
         
         powders.append(powder.copy())
         eventss.append(events.copy())
         cellIdss.append(cellIds.copy())
         modules.append(module)
     
-    # make global powder allowing for missing cells
-    cellIds = np.unique(np.concatenate(cellIdss))
-    powderg = np.zeros((NMODULES,) + powder.shape, powder.dtype)
-    for ci, c in enumerate(cellIds):
-        for module in range(NMODULES):
-            cj = np.where(cellIdss[module] == c)[0]
-            if len(cj) == 1 :
-                powderg[module, ci] = powders[module][cj[0]]
+    powderg = np.array(powders)
     
     print()
     print(f'writing output to {args.out}')
