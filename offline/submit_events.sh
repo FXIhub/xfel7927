@@ -40,7 +40,15 @@ python add_pulsedata.py \${run}
 python add_is_hit.py \${run} -t 4 --per_train
 
 # calculate powder patterns for hits and non-hits
-python save_powder_hits_nonhits.py \${run} 
+python powder.py \${run} -s is_hit True
+python powder.py \${run} -s is_hit False
+
+# calculate per-pixel powders 
+# looks for files in scratch/powder/r<run>_powder_*.h5
+python per_pixel_powder.py \${run} 
+
+# estimate background strength per event
+#python estimate_background.py \${run}
 
 echo events done
 EOT
