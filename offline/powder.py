@@ -95,14 +95,16 @@ def get_selection(select_events, run, out_folder):
         
         out = f'{out_folder}/r{run:>04}_powder_{select_events[0]}_{select_events[1]}.h5'
     else :
+        # this can't be pickled and so multiprocessing won't work
         # make a pretend nested dictionary
-        class A:
-            def __getitem__(self, i):
-                return True
-        class B:
-            def __getitem__(self, i):
-                return A()
-        select_tid_cid = B()
+        #class A:
+        #    def __getitem__(self, i):
+        #        return True
+        #class B:
+        #    def __getitem__(self, i):
+        #        return A()
+        #select_tid_cid = B()
+        select_tid_cid = None
  
         out = f'{out_folder}/r{run:>04}_powder.h5'
 
@@ -111,7 +113,7 @@ def get_selection(select_events, run, out_folder):
 
 
 class Powdersum():
-    def __init__(self, module, fnams, cellIds, select_tid_cid):
+    def __init__(self, module, fnams, cellIds, select_tid_cid, nproc):
         # make inverse
         self.cid_to_index = {}
         for i, c in enumerate(cellIds) :
@@ -124,14 +126,18 @@ class Powdersum():
         self.events_part = shmemarray.empty((len(fnams),) + (len(cellIds),)               , dtype = np.uint32)
         
         self.select_tid_cid = select_tid_cid
+        self.nproc = nproc
 
     def run(self, fnams, module):
         self.fnams  = fnams
         self.module = module
         
         assert(len(fnams)<= self.powder_part.shape[0])
+
+        if self.nproc is None :
+            self.nproc = len(self.fnams)
         
-        pool = mp.Pool(len(self.fnams))
+        pool = mp.Pool(processes=self.nproc)
         
         result_iter = pool.imap_unordered(
             self.run_worker, range(len(self.fnams)), chunksize=1
@@ -166,6 +172,12 @@ class Powdersum():
         data_src    = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/data'
         cellId_src  = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/cellId'
         trainId_src = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/trainId'
+
+        if self.select_tid_cid is not None :
+            process_event = lambda t, c: self.select_tid_cid[t][c]
+        else :
+            process_event = lambda t, c: True
+        
         with h5py.File(fnam) as f:
             data = f[data_src]
             cid  = f[cellId_src][()]
@@ -176,8 +188,12 @@ class Powdersum():
             for d in tqdm(range(data.shape[0]), disable = disable):
                 t = tid[d]
                 c = cid[d]
-                process_event = self.select_tid_cid[t][c]
-                if process_event :
+                try :
+                    p = process_event(t, c) 
+                except KeyError :
+                    p = False
+
+                if p :
                     data.read_direct(frame, np.s_[d], np.s_[:])
                     i = self.cid_to_index[c]
                     self.powder_part[proc, i] += frame
@@ -193,6 +209,8 @@ def main():
     parser.add_argument('run', type=int, help='Run number')
     parser.add_argument('-s', '--select_events', nargs='+', type = str,
                         help='The first argument is a dataset in the events file. The second argument is the flag to select e.g. "-s is_hit True" will calculate powder only for is_hit')
+    parser.add_argument('-n', '--nproc', type = int,
+                        help='number of processors to use (if None then will use 1 process for every module file')
     parser.add_argument('-o', '--out_folder', 
                         help='Path of output folder (default=%s/scratch/powder/)'%PREFIX,
                         default=PREFIX+'/scratch/powder/')
@@ -215,7 +233,7 @@ def main():
         fnams   = get_module_fnams(args.run, module)
         
         if module == 0:
-            powdersum = Powdersum(module, fnams, cellIds, select_tid_cid)
+            powdersum = Powdersum(module, fnams, cellIds, select_tid_cid, args.nproc)
         
         powder, events = powdersum.run(fnams, module)
         

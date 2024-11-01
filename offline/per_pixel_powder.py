@@ -16,7 +16,7 @@ def main():
                         default=PREFIX+'/scratch/powder/')
     args = parser.parse_args()
     
-    mask_fnam = f'{PREFIX}/r{args.run:>04}_mask.h5'
+    mask_fnam = f'{PREFIX}/scratch/det/r{args.run:>04}_mask.h5'
     
     # get matching per cell powder patterns
     fnams = glob.glob(f'{args.powder_folder}r{args.run:>04}_powder_*.h5')
@@ -40,7 +40,7 @@ def main():
     for out, fnam in zip(out_fnams, fnams) :
         print(f'processing powder {fnam}')
         with h5py.File(fnam) as f:
-            modules      = f['modules'][()]
+            modules      = f['modules'].shape[0]
             module_shape = f['data'].shape[-2:]
             shape = (modules,) + f['data'].shape[-2:]
         
@@ -53,7 +53,7 @@ def main():
             with h5py.File(fnam) as f:
                 powder_cell = f['data'][module]
                 events_cell = f['events'][module]
-                cellIds     = f['cellIds'][module]
+                cellIds     = f['cellIds'][()]
             
             powder_sum.fill(0)
             overlap.fill(0)
@@ -66,7 +66,7 @@ def main():
             
         print(f'writing per pixel powder to: {out}')
         with h5py.File(out, 'w') as f:
-            utils.update_h5(f, 'data', powder, dtype = np.float32, compression = True, chunks = powder.shape)
+            utils.update_h5(f, 'data', powder.astype(np.float32), compression = True, chunks = powder.shape)
 
 
 if __name__ == '__main__':

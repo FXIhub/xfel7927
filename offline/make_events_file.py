@@ -2,7 +2,7 @@
 add cellID, pulseID, trainID, detector distance to an events file, eg events/events_r0034.h5
 """
 
-import os
+import os, sys
 import argparse
 
 import numpy as np
@@ -41,11 +41,11 @@ def get_tid_cid_mapping_vds(vds):
     print(tids.shape, cids.shape)
     for i, (tid, cid) in enumerate(zip(tids, cids)):
         tc_to_vds_index[tid][cid] = i
-    return tc_to_vds_index
+    return tc_to_vds_index, tids.shape[0]
 
 
 class Events():
-    def __init__(self, module, fnams, mask, hit_mask, tc_to_vds_index):
+    def __init__(self, module, fnams, mask, hit_mask, tc_to_vds_index, Nevents):
         self.fnams    = fnams
         self.module   = module
         self.mask     = mask
@@ -53,7 +53,7 @@ class Events():
         self.tc_to_vds_index = tc_to_vds_index
          
         self.data_src = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{module}CH0:output/image/data'
-        
+
         N = 0
         # get total number of events
         for fnam in fnams:
@@ -61,30 +61,38 @@ class Events():
                 N += f[self.data_src].shape[0]
                 self.frame_type = f[self.data_src].dtype
         
-        self.events = N
+        self.events = Nevents
         
-        print(f'found {N} events for module {module}')
-
+        print(f'found {N} events for module {module} in files and {self.events} events in VDS file for {len(self.fnams)} files')
+        sys.stdout.flush()
+        
         # check if we can skip hit finding mask
         if not np.any(hit_mask):
             self.skip_hit = True
         else :
             self.skip_hit = False
         
-        self.lit      = shmemarray.empty((N,), dtype = np.uint64)
-        self.lit_mask = shmemarray.empty((N,), dtype = np.uint64)
+        self.lit      = shmemarray.empty((self.events,), dtype = np.uint64)
+        self.lit_mask = shmemarray.empty((self.events,), dtype = np.uint64)
+        self.lit[:]      = 0
+        self.lit_mask[:] = 0
          
-        self.counts      = shmemarray.empty((N,), dtype = np.uint64)
-        self.counts_mask = shmemarray.empty((N,), dtype = np.uint64)
+        self.counts      = shmemarray.empty((self.events,), dtype = np.uint64)
+        self.counts_mask = shmemarray.empty((self.events,), dtype = np.uint64)
+        self.counts[:]      = 0
+        self.counts_mask[:] = 0
         
-        self.cids = shmemarray.empty((N,), dtype = np.uint64)
-        self.tids = shmemarray.empty((N,), dtype = np.uint64)
+        self.cids = shmemarray.empty((self.events,), dtype = np.uint64)
+        self.tids = shmemarray.empty((self.events,), dtype = np.uint64)
+        self.cids[:] = 0
+        self.tids[:] = 0
+        
 
     def run(self):
         pool = mp.Pool(len(self.fnams))
         
         result_iter = pool.imap_unordered(
-            self.run_worker, range(len(self.fnams))
+            self.run_worker, range(len(self.fnams)), chunksize = 1
         )
         
         for r in result_iter:
@@ -114,6 +122,8 @@ class Events():
         data_src    = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/data'
         cellId_src  = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/cellId'
         trainId_src = f'/INSTRUMENT/SPB_DET_AGIPD1M-1/CORR/{self.module}CH0:output/image/trainId'
+        processed   = 0
+        skipped_events = 0
         with h5py.File(fnam) as f:
             data = f[data_src]
             cid  = f[cellId_src][()]
@@ -122,8 +132,14 @@ class Events():
             frame = np.empty(MODULE_SHAPE, dtype = self.frame_type)
             
             for d in tqdm(range(data.shape[0]), disable = disable):
+                try : 
+                    i = self.tc_to_vds_index[tid[d]][cid[d]]
+                except KeyError :
+                    #print(f'skipping train {tid[d]} cell {cid[d]} (not present in vds file)')
+                    skipped_events += 1
+                    continue
+                
                 data.read_direct(frame, np.s_[d], np.s_[:])
-                i = self.tc_to_vds_index[tid[d]][cid[d]]
 
                 self.cids[i] = cid[d]
                 self.tids[i] = tid[d]
@@ -142,6 +158,11 @@ class Events():
                     frame *= self.hit_mask
                     self.lit_mask[i]    = np.sum(frame>0)
                     self.counts_mask[i] = np.sum(frame)
+                
+                processed += 1
+
+        print('file', fnam, 'module', self.module, 'processed', processed, '/', self.events, 'events', 'skipped_events', skipped_events )
+        sys.stdout.flush()
         return True
 
 
@@ -184,7 +205,7 @@ def main():
         hit_mask = f['entry_1/good_pixels'][()]
     
     # get lookup table for trainId, cellIds -> vds index
-    tid_cid_mapping_vds = get_tid_cid_mapping_vds(vds_file)
+    tid_cid_mapping_vds, Nevents = get_tid_cid_mapping_vds(vds_file)
     
     litpixels     = []
     photon_counts = []
@@ -207,7 +228,7 @@ def main():
         
         fnams   = get_module_fnams(args.run, module)
         
-        events = Events(module, fnams, mask, hit_mask[module], tid_cid_mapping_vds)
+        events = Events(module, fnams, mask, hit_mask[module], tid_cid_mapping_vds, Nevents)
         
         litpix, counts, litpix_mask, counts_mask, N, cids, tids = events.run()
         
