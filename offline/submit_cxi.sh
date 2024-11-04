@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# call: ./submit_cxi.sh <run_no> <sample name>
-# eg:   ./submit_events.sh 2 DNA
+# call: ./submit_cxi.sh <run_no>
+# eg:   ./submit_events.sh 2
 
 source /etc/profile.d/modules.sh
 
@@ -31,9 +31,9 @@ source /etc/profile.d/modules.sh
 source $PARENT_DIR/source_this_at_euxfel
 
 run=\${SLURM_ARRAY_TASK_ID}
-echo ${1} run = \${run}   sample = ${2}
+echo ${1} run = \${run}
 
-python make_cxi_file.py \${run} -s ${2} -m r0551_mask.h5
+python make_cxi_file.py \${run} 
 
 # add background
 #python add_background_cxi.py \${run}
