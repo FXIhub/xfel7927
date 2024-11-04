@@ -4,13 +4,30 @@ import common
 
 parser = argparse.ArgumentParser(description='Save hits in photon units to a cxi file')
 parser.add_argument('run', type=int, help='Run number')
-parser.add_argument('-s', '--sample_name',
-                    help='name of sample',
-                    type=str, default='DNA Pointer')
+#parser.add_argument('-s', '--sample_name',
+#                    help='name of sample',
+#                    type=str, default='DNA Pointer')
 parser.add_argument('-m', '--mask', type=str, help=f'By default per-cell masks in {PREFIX}/scratch/det/r<runno>_mask.h5 are applied. Add a filename of global good pixels mask, located in {PREFIX}/scratch/det/')
 parser.add_argument('-n', '--nproc', type=int, default=1, help=f'number of processes to use')
 
 args = parser.parse_args()
+
+
+# get sample name from run_table
+# load run table
+import json
+default_run_table = f'{PREFIX}scratch/log/run_table.json'
+print(f'getting sample name from run table')
+run_table = json.load(open(default_run_table, 'r'))
+args.sample_name = None
+for r, v in run_table.items():
+    if run_dict['Run number'] == args.run :
+        args.sample_name = v['Sample']
+
+assert(args.sample_name is not None)
+print('sample name:', args.sample_name)
+
+
     
 args.output_file   = PREFIX+'scratch/saved_hits/r%.4d_hits.cxi' %args.run
 args.vds_file      = PREFIX+'scratch/vds/r%.4d.cxi' %args.run
