@@ -232,8 +232,7 @@ def main():
     for module in range(NMODULES):
         fnams   = get_module_fnams(args.run, module)
         
-        if module == 0:
-            powdersum = Powdersum(module, fnams, cellIds, select_tid_cid, args.nproc)
+        powdersum = Powdersum(module, fnams, cellIds, select_tid_cid, args.nproc)
         
         powder, events = powdersum.run(fnams, module)
         
