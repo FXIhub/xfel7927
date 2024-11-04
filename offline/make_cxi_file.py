@@ -7,8 +7,8 @@ parser.add_argument('run', type=int, help='Run number')
 parser.add_argument('-s', '--sample_name',
                     help='name of sample',
                     type=str, default='DNA Pointer')
-parser.add_argument('-m', '--mask', type=str, default='r0065_mask.h5', help=f'filename of global good pixels mask, located in {PREFIX}/scratch/det/')
-parser.add_argument('-n', '--nproc', type=int, default=16, help=f'number of processes to use')
+parser.add_argument('-m', '--mask', type=str, help=f'By default per-cell masks in {PREFIX}/scratch/det/r<runno>_mask.h5 are applied. Add a filename of global good pixels mask, located in {PREFIX}/scratch/det/')
+parser.add_argument('-n', '--nproc', type=int, default=1, help=f'number of processes to use')
 
 args = parser.parse_args()
     
@@ -21,6 +21,10 @@ else:
     args.mask_file     = None
 args.geom_file     = common.get_geom(args.run)
 args.z             = DET_DIST
+
+args.run_mask         = f'{PREFIX}scratch/det/r{args.run:>04}_mask.h5'
+# check that run mask file exists
+assert(os.path.exists(args.run_mask))
 
 import numpy as np
 import h5py
@@ -43,12 +47,26 @@ y_pixel_size = 200e-6
 pixel_area   = x_pixel_size * y_pixel_size
 xyz[2] = args.z
 
+# load per-cell mask
+print(f'loading per-cell mask {args.run_mask}')
+with h5py.File(args.run_mask) as f:
+    cids = f['entry_1/cellIds'][()]
+    mask = {}
+    data = f['entry_1/good_pixels']
+    for i, c in enumerate(cids) :
+        mask[c] = data[i]
+
+# add pixels for which all cells are masked to good_pixels
+temp = np.ones(mask[0].shape, dtype = int)
+for c in mask.keys():
+    temp += mask[c].astype(int)    
+
+good_pixels = temp > 0
+
 # get mask
 if args.mask_file :
     with h5py.File(args.mask_file) as f:
-        good_pixels = f['entry_1/good_pixels'][()]
-else :
-    good_pixels = np.ones(xyz.shape[1:], dtype=bool)
+        good_pixels *= f['entry_1/good_pixels'][()]
 
 """
 h5ls r0035_events.h5
@@ -196,22 +214,22 @@ with h5py.File(args.output_file, 'w') as f:
             compression_opts=1,
             shuffle=True)
 
-    detector_1.create_dataset("powder", 
-            shape=FRAME_SHAPE, 
-            dtype=np.uint64,
-            chunks=FRAME_SHAPE,
-            compression='gzip',
-            compression_opts=1,
-            shuffle=True)
+    #detector_1.create_dataset("powder", 
+    #        shape=FRAME_SHAPE, 
+    #        dtype=np.uint64,
+    #        chunks=FRAME_SHAPE,
+    #        compression='gzip',
+    #        compression_opts=1,
+    #        shuffle=True)
 
-    detector_1.create_dataset("powder_overlap", 
-            shape=FRAME_SHAPE, 
-            dtype=np.uint64,
-            chunks=FRAME_SHAPE,
-            compression='gzip',
-            compression_opts=1,
-            shuffle=True,
-            fillvalue = 0)
+    #detector_1.create_dataset("powder_overlap", 
+    #        shape=FRAME_SHAPE, 
+    #        dtype=np.uint64,
+    #        chunks=FRAME_SHAPE,
+    #        compression='gzip',
+    #        compression_opts=1,
+    #        shuffle=True,
+    #        fillvalue = 0)
 
     detector_1.create_dataset("good_pixels", 
             data=good_pixels, 
@@ -246,27 +264,28 @@ def worker(rank, lock):
         it = tqdm(range(len(my_indices)), desc = f'Processing data from {args.vds_file}')
     else :
         it = range(len(my_indices))
-    powder    = np.zeros(FRAME_SHAPE, dtype = np.uint64)
-    overlap   = np.zeros(FRAME_SHAPE, dtype = np.uint64)
+    #powder    = np.zeros(FRAME_SHAPE, dtype = np.uint64)
+    #overlap   = np.zeros(FRAME_SHAPE, dtype = np.uint64)
     
     frame_buf = np.empty((len(my_indices),) + FRAME_SHAPE, dtype=data_dtype)
 
     with h5py.File(args.vds_file) as g:
         data = g[VDS_DATASET]
-        mask = g[VDS_MASK_DATASET]
+        #mask = g[VDS_MASK_DATASET]
         
         for i in it:
             index = my_indices[i]
+            cid   = cellId_vds[index]
             
             frame_buf[i] = np.squeeze(data[index])
-            m            = np.squeeze(mask[index] == 0)
+            #m            = np.squeeze(mask[index] == 0)
               
             # apply per-frame mask
-            frame_buf[i] *= m   
-
+            frame_buf[i] *= mask[cid]  
+            
             # add to powder
-            powder  += frame_buf[i]
-            overlap += m
+            #powder  += frame_buf[i]
+            #overlap += m
             
             # make sure we have the right event
             assert(cellId_vds[index] == cellId_lit[index])
@@ -282,13 +301,13 @@ def worker(rank, lock):
                 f['entry_1/instrument_1/detector_1/data'][events_rank[rank] + i] = np.clip(frame_buf[i], 0, np.iinfo(frame_buf.dtype).max)
             
             # update powder
-            powder_file  = f['entry_1/instrument_1/detector_1/powder'][()]
-            powder_file += powder
-            f['entry_1/instrument_1/detector_1/powder'][:] = powder_file
+            #powder_file  = f['entry_1/instrument_1/detector_1/powder'][()]
+            #powder_file += powder
+            #f['entry_1/instrument_1/detector_1/powder'][:] = powder_file
                 
-            overlap_file  = f['entry_1/instrument_1/detector_1/powder_overlap'][()]
-            overlap_file += overlap
-            f['entry_1/instrument_1/detector_1/powder_overlap'][:] = overlap_file
+            #overlap_file  = f['entry_1/instrument_1/detector_1/powder_overlap'][()]
+            #overlap_file += overlap
+            #f['entry_1/instrument_1/detector_1/powder_overlap'][:] = overlap_file
         
         sys.stdout.flush()
         lock.release()
