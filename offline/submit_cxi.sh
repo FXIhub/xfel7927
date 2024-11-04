@@ -36,7 +36,7 @@ echo ${1} run = \${run}   sample = ${2}
 python make_cxi_file.py \${run} -s ${2} -m r0551_mask.h5
 
 # add background
-python add_background_cxi.py \${run}
+#python add_background_cxi.py \${run}
 
 echo cxi done
 
