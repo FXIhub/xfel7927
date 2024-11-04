@@ -40,8 +40,8 @@ python add_pulsedata.py \${run}
 python add_is_hit.py \${run} -t 4 --per_train
 
 # calculate powder patterns for hits and non-hits
-python powder.py \${run} -s is_hit True
-python powder.py \${run} -s is_hit False
+#python powder.py \${run} -s is_hit True
+#python powder.py \${run} -s is_hit False
 
 # calculate per-pixel powders 
 # looks for files in scratch/powder/r<run>_powder_*.h5
