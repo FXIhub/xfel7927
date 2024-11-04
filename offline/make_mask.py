@@ -169,9 +169,9 @@ if __name__ == '__main__':
     args.output = f'{PREFIX}/scratch/det/r{args.run:>04}_mask.h5'
     
     if args.add_global_mask :
-        args.add_globa_mask = f'{PREFIX}/scratch/det/{args.add_globa_mask}'
-        print(f'loading user selected global mask {args.add_globa_mask}')
-        with h5py.File(args.add_globa_mask) as f:
+        args.add_global_mask = f'{PREFIX}/scratch/det/{args.add_global_mask}'
+        print(f'loading user selected global mask {args.add_global_mask}')
+        with h5py.File(args.add_global_mask) as f:
             global_mask = f['entry_1/good_pixels'][()]
     else :
         global_mask = np.ones((NMODULES,) + MODULE_SHAPE, dtype = bool)
