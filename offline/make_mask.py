@@ -208,7 +208,14 @@ if __name__ == '__main__':
         print(f'reading powder from: {args.powder}')
         powder_cell = np.zeros((len(cellIds),) + MODULE_SHAPE, dtype = powder_cell_dtype)
         with h5py.File(args.powder) as f:
-            cs     = f['cellIds'][module]
+            # deal with my stupidity re cellIds per module or not
+            if len(f['cellIds'].shape) == 2 :
+                cs     = f['cellIds'][module]
+            elif len(f['cellIds'].shape) == 1 :
+                cs     = f['cellIds'][()]
+            else :
+                raise ValueError('something wrong with powder cellIds')
+            
             for cellId in cellIds:
                 c = np.where(cellId == cs)[0]
                 if len(c) == 1 :
