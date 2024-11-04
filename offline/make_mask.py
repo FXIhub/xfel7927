@@ -162,10 +162,19 @@ if __name__ == '__main__':
     parser.add_argument('--std_powder_cell', type=float, default=3)
     parser.add_argument('--median_filter_size', type=int, default=8)
     parser.add_argument('--median_filter_ratio', type=float, default=1.2)
+    parser.add_argument('--add_global_mask', type=str, default='stray_light_mask.h5')
     args = parser.parse_args()
 
     args.powder = f'{PREFIX}/scratch/powder/r{args.run:>04}_powder.h5'
     args.output = f'{PREFIX}/scratch/det/r{args.run:>04}_mask.h5'
+    
+    if args.add_global_mask :
+        args.add_globa_mask = f'{PREFIX}/scratch/det/{args.add_globa_mask}'
+        print(f'loading user selected global mask {args.add_globa_mask}')
+        with h5py.File(args.add_globa_mask) as f:
+            global_mask = f['entry_1/good_pixels'][()]
+    else :
+        global_mask = np.ones((NMODULES,) + MODULE_SHAPE, dtype = bool)
     
     # get cellIds from powder
     with h5py.File(args.powder) as f:
@@ -226,7 +235,7 @@ if __name__ == '__main__':
     # output
     print(f'writing mask and cellids to {args.output}')
     with h5py.File(args.output, 'w') as f:
-        utils.update_h5(f, 'entry_1/good_pixels', mask, compression=True, chunks = (1,) + mask.shape[1:])
+        utils.update_h5(f, 'entry_1/good_pixels', global_mask * mask, compression=True, chunks = (1,) + mask.shape[1:])
         utils.update_h5(f, 'entry_1/cellIds', cellIds, compression=True, chunks = cellIds.shape)
     
     # show powder
