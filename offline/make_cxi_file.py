@@ -89,6 +89,8 @@ if args.mask_file :
     with h5py.File(args.mask_file) as f:
         good_pixels *= f['entry_1/good_pixels'][()]
 
+print('{round(100 * np.sum(~good_pixels) / good_pixels.size, 2)}% masked pixels in good_pixels')
+sys.exit()
 """
 h5ls r0035_events.h5
 /cellId                  Dataset {1055808, 16}
