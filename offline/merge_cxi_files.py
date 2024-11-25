@@ -76,13 +76,27 @@ for fnam in cxi_in :
         
         frames += len(inds[fnam])
 
+# merge good_pixels
+print('merging good_pixels')
+key = 'entry_1/instrument_1/detector_1/good_pixels'
+mask = np.zeros(frame_shape, dtype = int)
+for fnam in cxi_in :
+    with h5py.File(fnam) as f:
+        mask += f[key][()]
+        print(f'updating mask with {round(100 * np.sum(mask==0) / mask.size, 2)}% of pixels masked', fnam)
+
+mask = mask > 0 
+with h5py.File(cxi_out, 'r+') as f:
+    f[key][:] = mask
+        
+
 index = 0
 for fnam in cxi_in :
     print(fnam)
     with h5py.File(fnam) as f:
         Nevents = f['/entry_1/data_1/data'].shape[0]
         
-        with h5py.File(cxi_out, 'a') as g:
+        with h5py.File(cxi_out, 'r+') as g:
             def write_data(name, obj):
                 if type(obj) == h5py.Dataset :
                     if (len(obj.shape) > 0) and (obj.shape[0] == Nevents) :
@@ -102,15 +116,6 @@ for fnam in cxi_in :
             
     index += len(inds[fnam])
 
-# merge good_pixels
-for fnam in cxi_in :
-    print('merging good_pixels')
-    key = 'entry_1/instrument_1/detector_1/good_pixels'
-    mask = np.ones(frame_shape, dtype = bool)
-    with h5py.File(fnam) as f:
-        mask *= f[key][()]
-        print('updating mask with {round(100 * np.sum(~mask) / mask.size, 2)}% of pixels masked', fnam)
-        
 
 # add soft link 
 with h5py.File(cxi_out, 'a') as g:

@@ -78,7 +78,7 @@ with h5py.File(args.run_mask) as f:
         mask[c] = data[i]
 
 # add pixels for which all cells are masked to good_pixels
-temp = np.ones(xyz[0].shape, dtype = int)
+temp = np.zeros(xyz[0].shape, dtype = int)
 for c in mask.keys():
     temp += mask[c].astype(int)    
 
@@ -89,8 +89,7 @@ if args.mask_file :
     with h5py.File(args.mask_file) as f:
         good_pixels *= f['entry_1/good_pixels'][()]
 
-print('{round(100 * np.sum(~good_pixels) / good_pixels.size, 2)}% masked pixels in good_pixels')
-sys.exit()
+print(f'{round(100 * np.sum(~good_pixels) / good_pixels.size, 2)}% masked pixels in good_pixels')
 """
 h5ls r0035_events.h5
 /cellId                  Dataset {1055808, 16}
@@ -261,7 +260,7 @@ with h5py.File(args.output_file, 'w') as f:
             compression_opts=1,
             shuffle=True,
             fillvalue = 0)
-    print('writing mask with {round(100 * np.sum(~good_pixels) / good_pixels.size, 2)}% of pixels masked')
+    print(f'writing mask with {round(100 * np.sum(~good_pixels) / good_pixels.size, 2)}% of pixels masked')
     
     # link /entry_1/data_1/data
     f["entry_1/data_1/data"] = h5py.SoftLink('/entry_1/instrument_1/detector_1/data')
