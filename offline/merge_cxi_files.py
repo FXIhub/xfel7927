@@ -18,7 +18,6 @@ def load_config(path):
 from constants import PREFIX
 
 #cxi_out = f'{PREFIX}/scratch/saved_hits/Ery_strong.cxi'
-runs = range(642)
 max_frames  = 1e10
 
 config     = load_config(sys.argv[1])
@@ -27,6 +26,7 @@ cxi_out    = config['cxi_out']
 cxi_filter = config['cxi_filter']
 
 #cxi_in = []
+# runs = range(642)
 #for run in runs :
 #    fnam = PREFIX+'/scratch/saved_hits/r%.4d_hits.cxi'%run
 #    if os.path.exists(fnam) :
@@ -54,6 +54,7 @@ cxi_filter = config['cxi_filter']
 # copy non event related data from first file
 with h5py.File(cxi_in[0]) as f:
     Nevents = f['/entry_1/data_1/data'].shape[0]
+    frame_shape = f['/entry_1/data_1/data'].shape[1:]
     
     with h5py.File(cxi_out, 'w') as g:
         def write_data(name, obj):
@@ -100,6 +101,16 @@ for fnam in cxi_in :
             f.visititems(write_data)
             
     index += len(inds[fnam])
+
+# merge good_pixels
+for fnam in cxi_in :
+    print('merging good_pixels')
+    key = 'entry_1/instrument_1/detector_1/good_pixels'
+    mask = np.ones(frame_shape, dtype = bool)
+    with h5py.File(fnam) as f:
+        mask *= f[key][()]
+        print('updating mask with {round(100 * np.sum(~mask) / mask.size, 2)}% of pixels masked', fnam)
+        
 
 # add soft link 
 with h5py.File(cxi_out, 'a') as g:
