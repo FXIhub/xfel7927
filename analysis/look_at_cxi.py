@@ -163,7 +163,10 @@ with h5py.File(args.cxi) as f:
     xyz = f['/entry_1/instrument_1/detector_1/xyz_map'][()]
 
     # also load powder
-    powder = f['/entry_1/instrument_1/detector_1/powder'][()]
+    if '/entry_1/instrument_1/detector_1/powder' in f :
+        powder = f['/entry_1/instrument_1/detector_1/powder'][()]
+    else :
+        powder = np.zeros(xyz.shape[1:], dtype = float)
 
 
 f = h5py.File(args.cxi)
