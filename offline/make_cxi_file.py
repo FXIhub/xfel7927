@@ -259,6 +259,7 @@ with h5py.File(args.output_file, 'w') as f:
             compression_opts=1,
             shuffle=True,
             fillvalue = 0)
+    print('writing mask with {round(100 * np.sum(~good_pixels) / good_pixels.size, 2)}% of pixels masked')
     
     # link /entry_1/data_1/data
     f["entry_1/data_1/data"] = h5py.SoftLink('/entry_1/instrument_1/detector_1/data')
