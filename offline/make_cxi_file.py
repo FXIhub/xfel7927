@@ -15,13 +15,17 @@ args = parser.parse_args()
 
 # get sample name from run_table
 # load run table
+import os
 import json
 default_run_table = f'{PREFIX}scratch/log/run_table.json'
 print(f'getting sample name from run table')
 run_table = json.load(open(default_run_table, 'r'))
 args.sample_name = None
 for r, v in run_table.items():
-    if run_dict['Run number'] == args.run :
+    if not isinstance(v, dict):
+        continue
+    
+    if v['Run number'] == args.run :
         args.sample_name = v['Sample']
 
 assert(args.sample_name is not None)
@@ -74,7 +78,7 @@ with h5py.File(args.run_mask) as f:
         mask[c] = data[i]
 
 # add pixels for which all cells are masked to good_pixels
-temp = np.ones(mask[0].shape, dtype = int)
+temp = np.ones(xyz[0].shape, dtype = int)
 for c in mask.keys():
     temp += mask[c].astype(int)    
 
