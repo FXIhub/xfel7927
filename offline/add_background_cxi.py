@@ -80,7 +80,7 @@ for train in unique_trainIds:
     m = np.where(train == trainIds)[0]
 
     # misses in train
-    n = misses * m
+    n = m[misses[m]]
     
     # sum K
     Ksum = np.sum(photon_counts[n])
