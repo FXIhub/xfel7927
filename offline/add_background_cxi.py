@@ -111,7 +111,7 @@ with h5py.File(args.output_file, 'a') as f:
     vds_index = f['/entry_1/vds_index'][()]
     
     key = '/entry_1/background_weighting'
-    utils.update_h5(f, key, b.astype(np.float32), compression = True)
+    utils.update_h5(f, key, b[vds_index].astype(np.float32), compression = True)
 
 
 print('add_background Done')
