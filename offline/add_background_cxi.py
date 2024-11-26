@@ -74,7 +74,6 @@ back_counts = np.sum(back)
 
 # calculate adjustment factor
 a_d = -np.ones(trainIds.shape[0], dtype = float)
-a_t = {}
 
 for train in unique_trainIds:
     m = np.where(train == trainIds)[0]
@@ -82,11 +81,12 @@ for train in unique_trainIds:
     # misses in train
     n = m[misses[m]]
     
-    # sum K
-    Ksum = np.sum(photon_counts[n])
-    
-    a_t[train] = Ksum / (back_counts * np.sum(n)) 
-    a_d[m] = a_t
+    if len(n) > 0 :
+        # sum K
+        Ksum = np.sum(photon_counts[n])
+        
+        a_t = Ksum / (back_counts * np.sum(n)) 
+        a_d[m] = a_t
 
 # b = e_d a_d / <e>
 b = -np.ones(a_d.shape[0], dtype = float)
