@@ -85,7 +85,7 @@ for train in unique_trainIds:
         # sum K
         Ksum = np.sum(photon_counts[n])
         
-        a_t = Ksum / (back_counts * np.sum(n)) 
+        a_t = Ksum / (back_counts * len(n))
         a_d[m] = a_t
 
 # b = e_d a_d / <e>
