@@ -10,6 +10,7 @@ args = parser.parse_args()
 args.output_file   = PREFIX+'scratch/saved_hits/r%.4d_hits.cxi' %args.run
 args.vds_file      = PREFIX+'scratch/vds/r%.4d.cxi' %args.run
 args.events_file   = PREFIX+'scratch/events/r%.4d_events.h5'%args.run
+args.back_file     = PREFIX+'scratch/powder/r%.4d_powder_is_hit_False_per_pixel.h5'%args.run
 
 import numpy as np
 import h5py
@@ -19,109 +20,101 @@ import sys
 import time
 import utils
 
-import multiprocessing as mp
 
 """
-h5ls r0035_events.h5
-/cellId                  Dataset {1055808, 16}
-/is_hit                  Dataset {1055808}
-/is_miss                 Dataset {1055808}
-/litpixels               Dataset {1055808, 16}
-/pulseId                 Dataset {1055808}
-/pulse_energy            Dataset {1055808}
-/total_intens            Dataset {1055808, 16}
-/trainId                 Dataset {1055808}
-/wavelength              Dataset {1055808}
+h5ls -r r0600_events.h5
+/                        Group
+/cellId                  Dataset {1052649}
+/hit_median_train        Dataset {1052649}
+/hit_sigma               Dataset {1052649}
+/hit_std_train           Dataset {1052649}
+/is_hit                  Dataset {1052649}
+/is_miss                 Dataset {1052649}
+/litpixels               Dataset {1052649}
+/litpixels_mask          Dataset {1052649}
+/modules                 Dataset {16}
+/pulse_energy            Dataset {1052649}
+/total_intens            Dataset {1052649}
+/total_intens_mask       Dataset {1052649}
+/trainId                 Dataset {1052649}
+/wavelength              Dataset {1052649}
+
+
+h5ls -r r0600_powder_is_hit_False_per_pixel.h5
+/                        Group
+/data                    Dataset {16, 512, 128}
 """
 
-print(f'loading miss selection from {args.events_file}')
+# calculate background adjustment factor per train
+#
+# a_t = sum_(d misses in train t) K_di / (<B>_i x number of misses in train t)
+#
+# b_d = e_d x a_d / <e> 
+# where e_d is the pulse energy and a_(t_d) is the adjustment factor for frame d
+
+# minimum reliable energy reading
+emin = 1e-3
+
+# mean pulse energy 
 with h5py.File(args.events_file) as f:
-    # indices for definite miss
-    #m = f['is_miss'][()]
-    m = ~f['is_hit'][()]
-    indices = np.where(m)[0]
+    e      = f['pulse_energy'][()]
     
-    if len(f['cellId'].shape) == 2 :
-        cellId_lit    = f['cellId'][:, 0]
-    elif len(f['cellId'].shape) == 1 :
-        cellId_lit    = f['cellId'][:]
-    else :
-        raise ValueError(f'unknown cellId shape in {args.events_file}')
+    trainIds = f['/trainId'][()]
+    misses   = ~f['/is_hit'][()]
+    photon_counts = f['/total_intens'][()]
 
-    trainId_lit   = f['trainId'][()]
-    pulseId_lit   = f['pulseId'][()]
+unique_trainIds = np.unique(trainIds)
 
-Nevents = len(indices)
+# mean background 
+with h5py.File(args.back_file) as f:
+    back = f['data'][()]
 
-print(f'found {Nevents} events labeled as miss')
-sys.stdout.flush()
+# mean background signal per shot
+back_counts = np.sum(back)
 
-#size = mp.cpu_count()
-size = 16
+# calculate adjustment factor
+a_d = -np.ones(trainIds.shape[0], dtype = float)
+a_t = {}
 
-# split frames over ranks
-events_rank = np.linspace(0, Nevents, size+1).astype(int)
+for train in unique_trainIds:
+    m = np.where(train == trainIds)[0]
 
-# load event ids for cross-checking
-with h5py.File(args.vds_file) as g:
-    cellId_vds = g['entry_1/cellId'][:, 0]
-    trainId_vds = g['entry_1/trainId'][()]
-    pulseId_vds = g['entry_1/pulseId'][()]
-
-def worker(rank, b):
-    my_indices = indices[events_rank[rank]: events_rank[rank+1]] 
+    # misses in train
+    n = misses * m
     
-    print(f'rank {rank} is processing indices {events_rank[rank]} to {events_rank[rank+1]}')
-    sys.stdout.flush()
-
-    if rank == 0 :
-        it = tqdm(range(len(my_indices)), desc = f'Processing data from {args.vds_file}')
-    else :
-        it = range(len(my_indices))
-
-    background = np.zeros(FRAME_SHAPE, dtype=float)
-    overlap    = np.zeros(FRAME_SHAPE, dtype=int)
+    # sum K
+    Ksum = np.sum(photon_counts[n])
     
-    with h5py.File(args.vds_file) as g:
-        data = g[VDS_DATASET]
-        mask = g[VDS_MASK_DATASET]
-        
-        for i in it:
-            index = my_indices[i]
-            
-            frame = np.squeeze(data[index])
-            m     = np.squeeze(mask[index] == 0)
-            
-            background += frame * m
-            overlap    += m
-            
-            # make sure we have the right event
-            assert(cellId_vds[index] == cellId_lit[index])
-            assert(trainId_vds[index] == trainId_lit[index])
-            assert(pulseId_vds[index] == pulseId_lit[index])
+    a_t[train] = Ksum / (back_counts * np.sum(n)) 
+    a_d[m] = a_t
 
-    b.put([background, overlap])
+# b = e_d a_d / <e>
+b = -np.ones(a_d.shape[0], dtype = float)
 
+# don't rely on energy readings above 1e-3
+m = e > emin
+e[m]  = e[m] / np.mean(e[m])
+e[~m] = 1
 
-b = mp.Queue()
-jobs = [mp.Process(target=worker, args=(m, b)) for m in range(size)]
-[j.start() for j in jobs]
+b = e * a_d 
 
-background_g = np.zeros(FRAME_SHAPE, dtype=float)
-overlap_g    = np.zeros(FRAME_SHAPE, dtype=int)
-for r in range(size):
-    background, overlap = b.get()
-    background_g += background
-    overlap_g    += overlap
-[j.join() for j in jobs]
+# write to events file
+with h5py.File(args.events_file, 'r+') as f:
+    key = 'background_weighting'
+    utils.update_h5(f, key, b.astype(np.float32), compression = True)
 
-out = background_g / np.clip(overlap_g, 1, None)
-
+# write to cxi file
 with h5py.File(args.output_file, 'a') as f:
     key = 'entry_1/instrument_1/detector_1/background'
-    utils.update_h5(f, key, out.astype(np.float32), compression = True)
+    utils.update_h5(f, key, back.astype(np.float32), compression = True)
 
-print('Done')
+    vds_index = f['/entry_1/vds_index'][()]
+    
+    key = '/entry_1/background_weighting'
+    utils.update_h5(f, key, b.astype(np.float32), compression = True)
+
+
+print('add_background Done')
 sys.stdout.flush()
 
 
