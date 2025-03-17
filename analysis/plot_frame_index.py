@@ -10,6 +10,9 @@ def parse_cmdline_args():
     parser.add_argument('run', type=int, help="run number of the VDS file.")
     parser.add_argument('index', type=int, help="frame index in file")
     
+    parser.add_argument('--vmin', type=float, default = None, help="minimum value")
+    parser.add_argument('--vmax', type=float, default = None, help="maximum value")
+    
     args = parser.parse_args()
     args.vds_file    = PREFIX+'scratch/vds/r%.4d.cxi' % args.run
     return args
@@ -26,4 +29,6 @@ with h5py.File(args.vds_file) as f:
 # display
 geom = extra_geom.AGIPD_1MGeometry.from_crystfel_geom(geom_fnam)
 
-geom.plot_data(frame)
+import matplotlib.pyplot as plt
+geom.plot_data(frame, vmin=args.vmin, vmax=args.vmax)
+plt.show()

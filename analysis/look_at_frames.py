@@ -52,6 +52,8 @@ class Application(QtWidgets.QMainWindow):
         self.display[:] = np.nan
           
         self.in_replot = False
+        self.frame_index = -1
+        self.file_index  = -1
         
         self.initUI()
         
@@ -82,13 +84,14 @@ class Application(QtWidgets.QMainWindow):
         vbox = QtWidgets.QVBoxLayout()
         vbox.addWidget(self.plot)
         vbox.addWidget(z_sliderW)
+
+        self.replot_frame(True)
     
         ## Display the widget as a new window
         w.setLayout(vbox)
         self.setCentralWidget(w)
         self.resize(800, 480)
         
-        self.replot_frame(True)
 
     def replot_frame(self, auto=False):
         if self.in_replot:
@@ -155,7 +158,7 @@ print(f'sorting frames by dataset {sort_dataset} in {args.events_file}')
 with h5py.File(args.events_file) as f:
     if sort_dataset :
         sort_data      = f[sort_dataset][()]
-        sorted_indices = np.sort(sort_data)[::-1]
+        sorted_indices = np.argsort(sort_data)[::-1]
         sort_data      = sort_data[sorted_indices]
     else :
         sort_data      = np.arange(f[sort_dataset].shape[0])
@@ -171,6 +174,7 @@ app = QtWidgets.QApplication([])
 
 pg.setConfigOption('background', pg.mkColor(0.1))
 pg.setConfigOption('foreground', 'w')
+pg.setConfigOptions(antialias=True)
     
 a = Application(data, geom, sorted_indices, sort_data)
 a.show()
