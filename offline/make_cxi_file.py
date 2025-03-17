@@ -289,8 +289,10 @@ def worker(rank, lock):
         it = range(len(my_indices))
     #powder    = np.zeros(FRAME_SHAPE, dtype = np.uint64)
     #overlap   = np.zeros(FRAME_SHAPE, dtype = np.uint64)
+    with h5py.File(args.vds_file) as g:
+        vds_dtype = g[VDS_DATASET].dtype
     
-    frame_buf = np.empty((len(my_indices),) + FRAME_SHAPE, dtype=data_dtype)
+    frame_buf = np.empty((len(my_indices),) + FRAME_SHAPE, dtype=vds_dtype)
 
     with h5py.File(args.vds_file) as g:
         data = g[VDS_DATASET]

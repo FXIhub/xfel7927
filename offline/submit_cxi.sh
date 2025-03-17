@@ -36,7 +36,7 @@ echo ${1} run = \${run}
 python make_cxi_file.py \${run} 
 
 # add background
-#python add_background_cxi.py \${run}
+python add_background_cxi.py \${run}
 
 echo cxi done
 

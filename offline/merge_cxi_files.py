@@ -90,6 +90,30 @@ with h5py.File(cxi_out, 'r+') as f:
     f[key][:] = mask
         
 
+# stack background images 
+key = '/entry_1/instrument_1/detector_1/background'
+backgrounds = []
+background_inds = np.empty((frames,), dtype = np.uint32)
+index = 0
+for i, fnam in enumerate(cxi_in) :
+    with h5py.File(fnam) as f:
+        Nevents = f['/entry_1/data_1/data'].shape[0]
+        
+        print(f'loading background from {fnam}')
+        backgrounds.append(f[key][()])
+        background_inds[index: index + len(inds[fnam])] = i
+    
+    index += len(inds[fnam])
+
+backgrounds = np.array(backgrounds)
+
+# write to cxi file
+with h5py.File(cxi_out, 'r+') as g:
+    if key in g :
+        del g[key]
+    g.create_dataset(key, data = backgrounds, compression = 'gzip', compression_opts = 1, chunks = (1,) + backgrounds.shape[1:])
+    g.create_dataset('entry_1/background_index', data = background_inds, compression = 'gzip', compression_opts = 1)
+
 index = 0
 for fnam in cxi_in :
     print(fnam)
