@@ -22,7 +22,7 @@ sbatch <<EOT
 ##SBATCH --reservation=upex_${EXP_ID}
 #SBATCH --partition=upex
 
-set -e 
+set -e
 
 source /etc/profile.d/modules.sh
 source $PARENT_DIR/source_this_at_euxfel
