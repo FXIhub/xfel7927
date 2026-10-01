@@ -17,6 +17,8 @@ Pulse alignment (verified on r0600):
 Output layout (all per-event arrays have shape (Nevents,)):
     run, pulseId, timestamp
     pulse/<name>          per-pulse quantities (XGM, LITFRM, hit finder, lit pixels)
+    pulse/background_weighting  add_background_cxi.py weighting recomputed with LITFRM pulse
+                          energies (pulse/background_weighting_old reproduces the old values)
     train/<name>          per-train control values (electrospray, motors, attenuators, ...)
     runs/{run, first_train, last_train, start_time}
 
@@ -27,6 +29,7 @@ Usage (on maxwell, after source ../source_this_at_euxfel; use an srun/sbatch nod
 """
 import argparse
 import json
+import os
 import sys
 
 import numpy as np
@@ -263,6 +266,66 @@ def process_run(dc, ev, cellId, trainId, out):
         out.set(f'train/{name}', ev[ok], vals, units, src, key)
 
 
+# minimum reliable pulse energy reading (J), as in add_background_cxi.py
+EMIN = 1e-3
+
+
+def background_weighting(run, dc, ev, vds_index, trainId, cellId, out):
+    """Recompute add_background_cxi.py's per-frame background weighting
+        b_d = a_t(d) * e_d / <e>
+    with e_d the XGM pulse energy of frame d taken via LITFRM, instead of the
+    mis-indexed events-file pulse_energy. a_t (per train, from the photon counts
+    of the misses and the per-run non-hit powder) is unchanged. The old weighting
+    is recomputed too, as a check against the merged file."""
+    events_file = f'{PREFIX}scratch/events/r{run:04d}_events.h5'
+    back_file = f'{PREFIX}scratch/powder/r{run:04d}_powder_is_hit_False_per_pixel.h5'
+    if not (os.path.exists(events_file) and os.path.exists(back_file)):
+        print(f'WARNING: no events or background file for run {run}, background weighting skipped', file=sys.stderr)
+        return
+    with h5py.File(events_file) as f:
+        tid = f['trainId'][()].astype(np.int64)
+        cid = f['cellId'][()]
+        cid = (cid[:, 0] if cid.ndim == 2 else cid).astype(np.int64)
+        misses = ~f['is_hit'][()]
+        photon_counts = f['total_intens'][()]
+        e_old = f['pulse_energy'][()]
+    with h5py.File(back_file) as f:
+        back_counts = np.sum(f['data'][()])
+
+    v = vds_index[ev]
+    assert np.array_equal(tid[v], trainId[ev]) and np.array_equal(cid[v], cellId[ev]), \
+        f'events file of run {run} does not match the merged file vds_index'
+
+    # a_t: mean miss photon counts in the train / mean background counts (-1 if no misses)
+    ut, inv = np.unique(tid, return_inverse=True)
+    s = np.bincount(inv, photon_counts * misses)
+    n = np.bincount(inv, misses)
+    a_t = np.where(n > 0, s / (back_counts * np.clip(n, 1, None)), -1.)
+    a_d = a_t[inv]
+
+    def normalise(e):
+        e = np.array(e, dtype=float)
+        m = e > EMIN
+        e[m] /= np.mean(e[m])
+        e[~m] = 1
+        return e
+
+    # pulse energy of every frame in the run via LITFRM
+    e_new = np.full(len(tid), np.nan)
+    kd = dc[LITFRM_SRC, 'data.energyPerFrame']
+    rows, ok = per_train_rows(kd, tid)
+    vals, units = to_si(kd.ndarray().astype(float), get_units(kd))
+    assert units == 'J', units
+    e_new[ok] = vals[rows[ok], cid[ok]]
+
+    src = f'{events_file} + {back_file} + {LITFRM_SRC}'
+    out.set('pulse/background_weighting', ev, (normalise(e_new) * a_d)[v], '', src,
+            'a_t * e_d / <e>, e from LITFRM energyPerFrame')
+    out.set('pulse/background_weighting_old', ev, (normalise(e_old) * a_d)[v], '', src,
+            'a_t * e_d / <e>, e from events pulse_energy (as add_background_cxi.py)')
+    out.set('pulse/background_train_factor', ev, a_d[v], '', src, 'a_t')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Collect per-event run number, timestamp, pulse-resolved and per-train metadata for a merged cxi file')
     parser.add_argument('--list', type=int, metavar='RUN', help='list injector sources and keys for RUN and exit')
@@ -279,6 +342,7 @@ def main():
     with h5py.File(args.input) as f:
         trainId = f['entry_1/trainId'][()].astype(np.int64)
         cellId  = f['entry_1/cellId'][()].astype(np.int64)
+        vds_index = f['entry_1/vds_index'][()].astype(np.int64)
     Nevents = len(trainId)
     print(f'{Nevents} events in {args.input}')
 
@@ -308,6 +372,10 @@ def main():
 
         pos, ok = lookup(tids, trainId[ev])
         event_time[ev[ok]] = [iso(x) for x in ts[pos[ok]]]
+
+        # only the trains containing events
+        if LITFRM_SRC in dc.all_sources:
+            background_weighting(run, dc, ev, vds_index, trainId, cellId, out)
 
         # only the trains containing events
         dc = dc.select_trains(extra_data.by_id[np.unique(trainId[ev])])
