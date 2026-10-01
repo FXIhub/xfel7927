@@ -22,7 +22,8 @@ sbatch <<EOT
 #SBATCH -e ${EXP_PREFIX}/scratch/log/cxi-${EXP_ID}-%A-%a.out
 ##SBATCH --partition=upex-beamtime
 ##SBATCH --reservation=upex_${EXP_ID}
-#SBATCH --partition=upex
+##SBATCH --partition=upex
+#SBATCH --partition=allcpu
 
 # exit on first error
 set -e
@@ -34,6 +35,7 @@ run=\${SLURM_ARRAY_TASK_ID}
 echo ${1} run = \${run}
 
 python make_cxi_file.py \${run} 
+#python make_cxi_file_all_frames.py \${run} 
 
 # add background
 python add_background_cxi.py \${run}

@@ -2,13 +2,14 @@ import argparse
 from constants import PREFIX, DET_DIST, FRAME_SHAPE, VDS_DATASET, VDS_MASK_DATASET, SATURATION
 import common
 
-parser = argparse.ArgumentParser(description='Save hits in photon units to a cxi file')
+parser = argparse.ArgumentParser(description='Save all frames in photon units to a cxi file')
 parser.add_argument('run', type=int, help='Run number')
 #parser.add_argument('-s', '--sample_name',
 #                    help='name of sample',
 #                    type=str, default='DNA Pointer')
 parser.add_argument('-m', '--mask', type=str, help=f'By default per-cell masks in {PREFIX}/scratch/det/r<runno>_mask.h5 are applied. Add a filename of global good pixels mask, located in {PREFIX}/scratch/det/')
 parser.add_argument('-n', '--nproc', type=int, default=1, help=f'number of processes to use')
+parser.add_argument('-f', '--max_frames', type=int, default=35200, help=f'maximum number of frames to include in cxi file')
 
 args = parser.parse_args()
 
@@ -33,7 +34,7 @@ print('sample name:', args.sample_name)
 
 
     
-args.output_file   = PREFIX+'scratch/saved_hits/r%.4d_hits.cxi' %args.run
+args.output_file   = PREFIX+'scratch/saved_hits/r%.4d_all_frames.cxi' %args.run
 args.vds_file      = PREFIX+'scratch/vds/r%.4d.cxi' %args.run
 args.events_file   = PREFIX+'scratch/events/r%.4d_events.h5'%args.run
 if args.mask :
@@ -107,13 +108,14 @@ h5ls r0035_events.h5
 print(f'loading hit selection from {args.events_file}')
 with h5py.File(args.events_file) as f:
     # indices for definite hits
-    m = f['is_hit'][()]
-    indices = np.where(m)[0]
-    
+    is_hit = f['is_hit'][()]
+
     # indices for definite miss
-    m = f['is_miss'][()]
-    indices_miss = np.where(m)[0]
-        
+    is_miss = f['is_miss'][()]
+
+    indices = np.arange(min(args.max_frames, is_hit.shape[0]))
+    # indices = np.where(m)[0]
+    
     if len(f['cellId'].shape) == 2 :
         cellId_lit    = f['cellId'][:, 0]
     elif len(f['cellId'].shape) == 1 :
@@ -145,7 +147,7 @@ photon_energy = sc.h * sc.c / wavelength
     
 Nevents = len(indices)
 
-print(f'found {Nevents} events labeled as hit')
+print(f'found {Nevents} events')
 sys.stdout.flush()
 
 # entry_1/
@@ -223,6 +225,12 @@ with h5py.File(args.output_file, 'w') as f:
     if hit_sigma is not None :
         detector_1.create_dataset("hit_sigma",   data = hit_sigma[indices].astype(np.float32), compression='gzip', compression_opts=1, shuffle=True, chunks = True)
         detector_1['hit_sigma'].attrs['axes'] = "experiment_identifier"
+
+    detector_1.create_dataset("is_hit",   data = is_hit[indices].astype(np.float32), compression='gzip', compression_opts=1, shuffle=True, chunks = True)
+    detector_1['is_hit'].attrs['axes'] = "experiment_identifier"
+
+    detector_1.create_dataset("is_miss",   data = is_miss[indices].astype(np.float32), compression='gzip', compression_opts=1, shuffle=True, chunks = True)
+    detector_1['is_miss'].attrs['axes'] = "experiment_identifier"
     
     # write pixel map
     detector_1.create_dataset('xyz_map', data = xyz, compression='gzip', compression_opts=1, shuffle = True, dtype = np.float32)
@@ -323,7 +331,7 @@ def worker(rank, lock):
     if lock.acquire() :
         with h5py.File(args.output_file, 'a') as f:
             for i in it :
-                f['entry_1/instrument_1/detector_1/data'][events_rank[rank] + i] = np.clip(frame_buf[i], 0, np.iinfo(data_dtype).max)
+                f['entry_1/instrument_1/detector_1/data'][events_rank[rank] + i] = np.clip(frame_buf[i], 0, np.iinfo(frame_buf.dtype).max)
             
             # update powder
             #powder_file  = f['entry_1/instrument_1/detector_1/powder'][()]
