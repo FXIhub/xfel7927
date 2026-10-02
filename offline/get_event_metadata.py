@@ -9,7 +9,8 @@ facility unit is known; each dataset carries `units`, `source`, `key` attributes
 
 Pulse alignment (verified on r0600):
     AGIPD frame with cellId c has pulseId = LITFRM detectorPulseId[c] (= 4c here)
-    LITFRM energyPerFrame[c] is the XGM pulse energy for that frame
+    LITFRM energyPerFrame[c] is the XGM pulse energy for that frame, except for
+      some XGM dropouts where it reads 10 mJ (runs 538, 539)
     XGM pulse index for frame c is xgmPulseId[cumsum(nPulsePerFrame)[c] - 1]
       (indexing the XGM by cellId or pulseId, as add_pulsedata.py and
        xfel10662/make_cxi_file.py do, picks the wrong pulse for ~99% of frames)
@@ -266,6 +267,20 @@ def process_run(dc, ev, cellId, trainId, out):
         out.set(f'train/{name}', ev[ok], vals, units, src, key)
 
 
+def xgm_pulse_index(dc, tid, cid):
+    """XGM pulse index of each frame (trainId, cellId), -1 where unknown"""
+    lf = dc[LITFRM_SRC]
+    rows, ok = per_train_rows(lf['data.xgmPulseId'], tid)
+    npf = lf['data.nPulsePerFrame'].ndarray().astype(np.int64)
+    xpid = lf['data.xgmPulseId'].ndarray().astype(np.int64)
+    rank = np.cumsum(npf, axis=1) - 1
+    xi = np.full(len(tid), -1, dtype=np.int64)
+    r, c = rows[ok], cid[ok]
+    has = npf[r, c] > 0
+    xi[np.where(ok)[0][has]] = xpid[r[has], rank[r[has], c[has]]]
+    return xi
+
+
 # minimum reliable pulse energy reading (J), as in add_background_cxi.py
 EMIN = 1e-3
 
@@ -310,17 +325,21 @@ def background_weighting(run, dc, ev, vds_index, trainId, cellId, out):
         e[~m] = 1
         return e
 
-    # pulse energy of every frame in the run via LITFRM
+    # pulse energy of every frame in the run: SPB_XTD9 XGM at the frame's XGM
+    # pulse index (via LITFRM). LITFRM energyPerFrame is the same value except
+    # that it reads 10 mJ for some XGM dropouts (runs 538, 539).
     e_new = np.full(len(tid), np.nan)
-    kd = dc[LITFRM_SRC, 'data.energyPerFrame']
+    xi = xgm_pulse_index(dc, tid, cid)
+    kd = dc[XGM_SRCS['XGM_SPB_XTD9'], 'data.intensityTD']
     rows, ok = per_train_rows(kd, tid)
+    ok &= xi >= 0
     vals, units = to_si(kd.ndarray().astype(float), get_units(kd))
     assert units == 'J', units
-    e_new[ok] = vals[rows[ok], cid[ok]]
+    e_new[ok] = vals[rows[ok], xi[ok]]
 
-    src = f'{events_file} + {back_file} + {LITFRM_SRC}'
+    src = f'{events_file} + {back_file} + {LITFRM_SRC} + {XGM_SRCS["XGM_SPB_XTD9"]}'
     out.set('pulse/background_weighting', ev, (normalise(e_new) * a_d)[v], '', src,
-            'a_t * e_d / <e>, e from LITFRM energyPerFrame')
+            'a_t * e_d / <e>, e from the SPB_XTD9 XGM at the frame pulse')
     out.set('pulse/background_weighting_old', ev, (normalise(e_old) * a_d)[v], '', src,
             'a_t * e_d / <e>, e from events pulse_energy (as add_background_cxi.py)')
     out.set('pulse/background_train_factor', ev, a_d[v], '', src, 'a_t')
