@@ -27,6 +27,7 @@ Usage (on maxwell, after source ../source_this_at_euxfel; use an srun/sbatch nod
     python get_event_metadata.py --list 600     # print available injector sources/keys/units
     python get_event_metadata.py                # write sidecar for the default Ery file
     python get_event_metadata.py -i <cxi> -o <h5> -s <sample substring> [--runs 600 601]
+    python get_event_metadata.py -i scratch/vds/r0642.cxi --runs 642 -o <h5>  # every frame of a run
     python get_event_metadata.py --merge r0033.h5 r0034.h5 ... -o <h5>   # combine per-run outputs
     (submit_event_metadata_array.sh runs one job per run and then the merge)
 """
@@ -419,7 +420,12 @@ def main():
     with h5py.File(args.input) as f:
         trainId = f['entry_1/trainId'][()].astype(np.int64)
         cellId  = f['entry_1/cellId'][()].astype(np.int64)
-        vds_index = f['entry_1/vds_index'][()].astype(np.int64)
+        if cellId.ndim == 2:        # a VDS file: (frames, modules), every frame is an event
+            cellId = cellId[:, 0]
+        if 'entry_1/vds_index' in f:
+            vds_index = f['entry_1/vds_index'][()].astype(np.int64)
+        else:
+            vds_index = np.arange(len(trainId))
     Nevents = len(trainId)
     print(f'{Nevents} events in {args.input}')
 

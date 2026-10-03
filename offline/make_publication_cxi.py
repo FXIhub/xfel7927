@@ -25,8 +25,8 @@ number of events, Nb the number of runs (one background per run).
         title                   scalar          string             "p007927 {sample} hits, runs {first}-{last}"
         experiment_description  scalar          string             --description
         program_name            scalar          string             "xfel7927/offline/make_publication_cxi.py"
-        start_time              scalar          string             ISO 8601, start of the first run
-        end_time                scalar          string             ISO 8601, last train in the file
+        start_time              scalar          string             ISO 8601, first event (detector_1/start_time)
+        end_time                scalar          string             ISO 8601, last event
         sample_1/                                                  NXsample
           name                  scalar          string             "Erythrocruorin"
         instrument_1/                                              NXinstrument
@@ -34,7 +34,8 @@ number of events, Nb the number of runs (one background per run).
           source_1/                                                NXsource
             name                scalar          string             "European XFEL SASE1"
             energy              (N,)            float32  J         photon energy, undulator (per train)
-            pulse_energy        (N,)            float32  J         XGM SPB_XTD9 energy of this frame's pulse (via LITFRM)
+            pulse_energy        (N,)            float32  J         XGM SPB_XTD9 energy of this frame's pulse
+                                                                   (pulse index via LITFRM); <= 1 mJ: XGM dropout
             pulse_energy_sigma  (N,)            float32  J         XGM uncertainty of pulse_energy
             experiment_identifier -> /entry_1/experiment_identifier
           xgm_1/                                                   NXcollection, SPB_XTD9_XGM (downstream)
@@ -77,7 +78,9 @@ number of events, Nb the number of runs (one background per run).
             mask                (128, 64, 128)  uint32             CXI mask bits, see Mask below
             data                (N, 128, 64, 128) uint8  counts    photons per pixel, NOT masked
             powder              (128, 64, 128)  float32  counts    mean of data over all events
-            start_time          (N,)            string             train timestamp, ISO 8601 (ns)
+            start_time          (N,)            string             approximate train time, ISO 8601 (+-1 s):
+                                                                   t0_run + 0.1 s * trainId, t0_run the median
+                                                                   over the run's recorded train timestamps
             run                 (N,)            uint16             run number
             trainId             (N,)            uint64
             cellId              (N,)            uint16             AGIPD memory cell
@@ -219,6 +222,10 @@ BIT_ASIC_EDGE = 0x00020000
 
 GZ = dict(compression='gzip', compression_opts=1, shuffle=True)
 
+TRAIN_PERIOD_NS = 100_000_000
+TIMESTAMP_DESCRIPTION = ('approximate train time (ISO 8601, +-1 s): run offset + 0.1 s * trainId, the offset being the '
+                         'median over the train timestamps recorded in the run')
+
 NMODULES, NTILES = 16, 8
 TILE_SHAPE = (64, 128)
 PANEL_SHAPE = (NMODULES * NTILES,) + TILE_SHAPE
@@ -310,7 +317,48 @@ def load_geometry(runs, geom_run):
     return corner, basis, xyz, quadrant_correction, float(geom.pixel_size), fnam
 
 
-def build_mask(good_pixels, mask_file, edge_file):
+def approx_timestamps(run, trainId, ts):
+    """ISO 8601 time of each event's train: t = t0_run + 0.1 s * trainId, with
+    t0_run the median over the recorded train timestamps (ts, '' if missing)
+    of the run. The recorded timestamps scatter by ~1 s about this and are
+    missing for some trains; trainId is the exact 10 Hz clock. A run without any
+    recorded timestamp takes the offset of the run nearest in trainId."""
+    ts = np.asarray(ts, dtype=object)
+    known = np.array([len(t) > 0 for t in ts])
+    tid = trainId.astype(np.int64)
+    t_ns = np.zeros(len(ts), dtype=np.int64)
+    t_ns[known] = [np.datetime64(t.rstrip('Z'), 'ns').astype(np.int64) for t in ts[known]]
+    runs = np.unique(run)
+    t0 = {}
+    for r in runs:
+        k = (run == r) & known
+        if np.any(k):
+            t0[r] = np.median(t_ns[k] - tid[k] * TRAIN_PERIOD_NS)
+    if not t0:
+        sys.exit('no train timestamps recorded for any event')
+    # runs without any recorded timestamp take the offset of the run nearest in trainId
+    first = {r: tid[run == r].min() for r in runs}
+    for r in runs:
+        if r not in t0:
+            near = min(t0, key=lambda q: abs(first[q] - first[r]))
+            print(f'run {r} has no train timestamps, using the offset of run {near}')
+            t0[r] = t0[near]
+    out_ns = np.zeros(len(ts), dtype=np.int64)
+    for r in runs:
+        s = run == r
+        out_ns[s] = np.int64(np.rint(t0[r])) + tid[s] * TRAIN_PERIOD_NS
+    return np.array([np.datetime_as_string(np.datetime64(int(t), 'ns'), unit='ms') + 'Z' for t in out_ns], dtype=object)
+
+
+def edge_mask():
+    """good-pixel map excluding the first and last row of every tile (as Ery/mask_edges.py)"""
+    good = np.ones((NMODULES, NTILES * TILE_SHAPE[0], TILE_SHAPE[1]), dtype=bool)
+    good[:, ::TILE_SHAPE[0]] = False
+    good[:, TILE_SHAPE[0] - 1::TILE_SHAPE[0]] = False
+    return good
+
+
+def build_mask(good_pixels, mask_file, edge_file=None, edge_good=None):
     mask = np.zeros(good_pixels.shape, dtype=np.uint32)
     defs = []
     if mask_file:
@@ -324,9 +372,172 @@ def build_mask(good_pixels, mask_file, edge_file):
     if edge_file:
         with h5py.File(edge_file) as f:
             edge_good = f['data'][()].astype(bool)
+    if edge_good is not None:
         mask[~edge_good] |= BIT_ASIC_EDGE
         defs.append(f'0x{BIT_ASIC_EDGE:08x} user: ASIC edge pixel')
     return to_tiles(mask), defs
+
+
+def write_header(g, expid, title, description, program, timestamps, sample_name, sample_description=None):
+    """cxi_version, entry_1 (identifiers, title, times), sample_1 and instrument_1; returns (entry, instrument)"""
+    g['cxi_version'] = 160
+    entry = g.create_group('entry_1')
+    entry.attrs['NX_class'] = 'NXentry'
+    entry.create_dataset('experiment_identifier', data=expid, dtype=h5py.string_dtype(), **GZ)
+    entry['title'] = title
+    entry['experiment_description'] = description
+    entry['program_name'] = f'xfel7927/offline/{program}'
+    entry['start_time'] = min(timestamps)
+    entry['end_time'] = max(timestamps)
+
+    sample = entry.create_group('sample_1')
+    sample.attrs['NX_class'] = 'NXsample'
+    sample['name'] = sample_name
+    if sample_description:
+        sample['description'] = sample_description
+
+    instrument = entry.create_group('instrument_1')
+    instrument.attrs['NX_class'] = 'NXinstrument'
+    instrument['name'] = 'SPB'
+    return entry, instrument
+
+
+def write_beam_and_injector(instrument, meta):
+    """source_1, xgm_1/2, attenuator_1/2 and electrospray groups from the metadata file"""
+    source = instrument.create_group('source_1')
+    source.attrs['NX_class'] = 'NXsource'
+    source['name'] = 'European XFEL SASE1'
+    copy_meta(source, 'energy', meta, 'train/undulator_energy',
+              description='photon energy, undulator setting (per train)')
+    copy_meta(source, 'pulse_energy', meta, 'pulse/XGM_SPB_XTD9_intensityTD',
+              description='XGM (SPB_XTD9) pulse energy of the pulse that produced this frame '
+                          '(pulse index via LITFRM); values <= 1 mJ are XGM dropouts')
+    copy_meta(source, 'pulse_energy_sigma', meta, 'pulse/XGM_SPB_XTD9_intensitySigmaTD')
+
+    for i, (name, desc) in enumerate((('XGM_SPB_XTD9', 'SPB_XTD9_XGM, downstream gas monitor'),
+                                     ('XGM_SA1_XTD2', 'SA1_XTD2_XGM, upstream gas monitor')), 1):
+        xgm = instrument.create_group(f'xgm_{i}')
+        xgm.attrs['NX_class'] = 'NXcollection'
+        xgm['description'] = desc
+        for out, key in (('intensity', 'intensityTD'), ('intensity_sigma', 'intensitySigmaTD'),
+                         ('x', 'xTD'), ('y', 'yTD'), ('x_sigma', 'xSigmaTD'), ('y_sigma', 'ySigmaTD')):
+            copy_meta(xgm, out, meta, f'pulse/{name}_{key}')
+
+    for i, name in enumerate(('SA1_XTD2', 'SPB_XTD9'), 1):
+        att = instrument.create_group(f'attenuator_{i}')
+        att.attrs['NX_class'] = 'NXattenuator'
+        att['type'] = f'{name}_ATT'
+        copy_meta(att, 'attenuator_transmission', meta, f'train/attenuator/transmission_{name}')
+
+    es = instrument.create_group('electrospray')
+    es.attrs['NX_class'] = 'NXcollection'
+    for key in sorted(meta['train/electrospray']):
+        copy_meta(es, key, meta, f'train/electrospray/{key}')
+    for ax in 'xyz':
+        copy_meta(es, f'injector_{ax}', meta, f'train/injector/{ax}')
+    copy_meta(es, 'chamber_pressure', meta, 'train/chamber_pressure')
+
+
+def write_detector_static(instrument, geometry, mask, mask_defs):
+    """detector_1 with description, distance, pixel sizes, tile geometry and mask; returns detector_1"""
+    corner, basis, xyz, quadrant_correction, pixel_size = geometry
+    det = instrument.create_group('detector_1')
+    det.attrs['NX_class'] = 'NXdetector'
+    det['description'] = 'AGIPD 1M'
+    for name, val in (('distance', DET_DIST), ('x_pixel_size', pixel_size), ('y_pixel_size', pixel_size)):
+        det.create_dataset(name, data=val).attrs['units'] = 'm'
+    det.create_dataset('module_identifier', data=[f'AGIPD{m:02d}T{t}' for m in range(NMODULES) for t in range(NTILES)],
+                       dtype=h5py.string_dtype()).attrs['description'] = \
+        'tile t = rows 64t..64t+63 of AGIPD module mm; per-pixel arrays reshape (C order) to (16, 512, 128)'
+
+    ds = det.create_dataset('corner_position', data=corner)
+    ds.attrs.update(units='m', axes='module_identifier:coordinate')
+    ds = det.create_dataset('basis_vectors', data=basis)
+    ds.attrs.update(units='m', axes='module_identifier:dimension:coordinate')
+    ds = det.create_dataset('xyz_map', data=xyz, **GZ)
+    ds.attrs.update(units='m', axes='coordinate:module_identifier:y:x',
+                    description='pixel centre positions (same geometry as corner_position/basis_vectors)')
+    det.create_dataset('quadrant', data=['Q1', 'Q2', 'Q3', 'Q4'], dtype=h5py.string_dtype()).attrs['description'] = \
+        'quadrant q is modules 4q..4q+3, i.e. tiles (module_identifier) 32q..32q+31'
+    ds = det.create_dataset('quadrant_correction', data=quadrant_correction)
+    ds.attrs.update(units='m', axes='quadrant:coordinate',
+                    description='alternative geometry used in the 3D reconstructions: add quadrant_correction[q] to '
+                                'the positions of the tiles in quadrant q; fitted to the data, not supported by an '
+                                'independent refinement')
+
+    ds = det.create_dataset('mask', data=mask, **GZ)
+    ds.attrs['axes'] = 'module_identifier:y:x'
+    ds.attrs['bit_definitions'] = mask_defs
+    return det
+
+
+def write_event_ids(det, meta, timestamps, run, trainId, cellId, vds_index):
+    per_event(det, 'start_time', timestamps.astype(object), description=TIMESTAMP_DESCRIPTION)
+    per_event(det, 'run', run)
+    per_event(det, 'trainId', trainId.astype(np.uint64))
+    per_event(det, 'cellId', cellId.astype(np.uint16))
+    copy_meta(det, 'pulseId', meta, 'pulseId')
+    per_event(det, 'vds_index', vds_index, description='frame index in the per-run VDS file')
+
+
+def write_facility_scores(score, meta):
+    for name, key in (('facility_hitscore', 'pulse/hitfinder_hitscore'),
+                      ('facility_hit_flag', 'pulse/hitfinder_hitFlag'),
+                      ('facility_miss_flag', 'pulse/hitfinder_missFlag'),
+                      ('facility_threshold_mu', 'train/hitfinder_threshold_mu'),
+                      ('facility_threshold_sigma', 'train/hitfinder_threshold_sig'),
+                      ('facility_lit_pixels', 'pulse/litpx_litPixels'),
+                      ('facility_total_intensity', 'pulse/litpx_totalIntensity'),
+                      ('facility_unmasked_pixels', 'pulse/litpx_unmaskedPixels')):
+        copy_meta(score, name, meta, key)
+
+
+def write_motors_and_note(det, meta, geom_file):
+    """detector_1/motors (AGIPD motors) and note_1 (geometry provenance)"""
+    motors = det.create_group('motors')
+    motors.attrs['NX_class'] = 'NXcollection'
+    for key in sorted(meta['train/agipd_motors']):
+        copy_meta(motors, key, meta, f'train/agipd_motors/{key}')
+
+    note = det.create_group('note_1')
+    note.attrs['NX_class'] = 'NXnote'
+    note['file_name'] = os.path.basename(REFERENCE_GEOM)
+    note['description'] = (
+        'Detector geometry: facility reference geometry (this file) moved to the recorded AGIPD quadrant '
+        f'motor positions with extra_geom.motors.AGIPD_1MMotors ({os.path.relpath(geom_file, ROOT)}); '
+        'the motor positions are constant for all runs in this file. '
+        f'Pixel positions are then shifted by {BEAM_CENTRE_SHIFT[:2].tolist()} m in x, y '
+        '(mean beam centre correction from the data, consistent with an independent crystallographic '
+        'refinement) and z is set to the detector distance. quadrant_correction gives the per-quadrant '
+        'alternative used in the 3D reconstructions.')
+    with open(os.path.join(ROOT, REFERENCE_GEOM)) as gf:
+        note['data'] = gf.read()
+
+
+def write_footer(entry, program):
+    """data_1 (links to the frames) and process_1"""
+    data_1 = entry.create_group('data_1')
+    data_1.attrs['NX_class'] = 'NXdata'
+    data_1['data'] = h5py.SoftLink(f'/{DET}/data')
+    link_expid(data_1)
+
+    process = entry.create_group('process_1')
+    process.attrs['NX_class'] = 'NXprocess'
+    process['program'] = program
+    process['version'] = git_version()
+    process['date'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    process['command'] = ' '.join(sys.argv)
+
+
+def write_powder(det, powder_sum, N):
+    ds = det.create_dataset('powder', data=(powder_sum / N).astype(np.float32), **GZ)
+    ds.attrs.update(axes='module_identifier:y:x', units='counts',
+                    description=f'mean of data over all {N} events (unmasked, background included)')
+
+
+def frames_attrs(dst):
+    dst.attrs.update(axes='experiment_identifier:module_identifier:y:x', signal=1, units='counts',
+                     description='photons per pixel, not masked')
 
 
 def main():
@@ -360,7 +571,7 @@ def main():
                      dtype=object)
     assert len(np.unique(expid)) == N, 'experiment identifiers are not unique'
 
-    corner, basis, xyz, quadrant_correction, pixel_size, geom_file = load_geometry(runs, args.geom_run)
+    *geometry, geom_file = load_geometry(runs, args.geom_run)
 
     good_pixels = f[f'{DET}/good_pixels'][()].astype(bool)
     mask, mask_defs = build_mask(good_pixels, args.mask, args.edge_mask)
@@ -379,93 +590,15 @@ def main():
     bweight = meta['pulse/background_weighting'][()]
     background_counts = bweight * background.reshape(background.shape[0], -1).sum(1)[bindex]
 
-    timestamps = meta['timestamp'][()]
-    run_start = dict(zip(meta['runs/run'][()], meta['runs/start_time'].asstr()[()]))
+    timestamps = approx_timestamps(run, trainId, meta['timestamp'].asstr()[()])
+    sample_name = f['entry_1/sample_1/name'].asstr()[()]
 
     with h5py.File(args.output, 'w') as g:
-        g['cxi_version'] = 160
-
-        entry = g.create_group('entry_1')
-        entry.attrs['NX_class'] = 'NXentry'
-        entry.create_dataset('experiment_identifier', data=expid, dtype=h5py.string_dtype(), **GZ)
-        entry['title'] = f'p{PROPOSAL:06d} {f["entry_1/sample_1/name"].asstr()[()]} hits, runs {runs[0]}-{runs[-1]}'
-        entry['experiment_description'] = args.description
-        entry['program_name'] = 'xfel7927/offline/make_publication_cxi.py'
-        entry['start_time'] = min(run_start[r] for r in runs)
-        entry['end_time'] = max(t.decode() for t in timestamps)
-
-        sample = entry.create_group('sample_1')
-        sample.attrs['NX_class'] = 'NXsample'
-        sample['name'] = f['entry_1/sample_1/name'].asstr()[()]
-
-        instrument = entry.create_group('instrument_1')
-        instrument.attrs['NX_class'] = 'NXinstrument'
-        instrument['name'] = 'SPB'
-
-        # source
-        source = instrument.create_group('source_1')
-        source.attrs['NX_class'] = 'NXsource'
-        source['name'] = 'European XFEL SASE1'
-        copy_meta(source, 'energy', meta, 'train/undulator_energy',
-                  description='photon energy, undulator setting (per train)')
-        copy_meta(source, 'pulse_energy', meta, 'pulse/LITFRM_energyPerFrame',
-                  description='XGM (SPB_XTD9) pulse energy of the pulse that produced this frame')
-        copy_meta(source, 'pulse_energy_sigma', meta, 'pulse/LITFRM_energySigma')
-
-        # XGMs
-        for i, (name, desc) in enumerate((('XGM_SPB_XTD9', 'SPB_XTD9_XGM, downstream gas monitor'),
-                                         ('XGM_SA1_XTD2', 'SA1_XTD2_XGM, upstream gas monitor')), 1):
-            xgm = instrument.create_group(f'xgm_{i}')
-            xgm.attrs['NX_class'] = 'NXcollection'
-            xgm['description'] = desc
-            for out, key in (('intensity', 'intensityTD'), ('intensity_sigma', 'intensitySigmaTD'),
-                             ('x', 'xTD'), ('y', 'yTD'), ('x_sigma', 'xSigmaTD'), ('y_sigma', 'ySigmaTD')):
-                copy_meta(xgm, out, meta, f'pulse/{name}_{key}')
-
-        # attenuators
-        for i, name in enumerate(('SA1_XTD2', 'SPB_XTD9'), 1):
-            att = instrument.create_group(f'attenuator_{i}')
-            att.attrs['NX_class'] = 'NXattenuator'
-            att['type'] = f'{name}_ATT'
-            copy_meta(att, 'attenuator_transmission', meta, f'train/attenuator/transmission_{name}')
-
-        # electrospray injector
-        es = instrument.create_group('electrospray')
-        es.attrs['NX_class'] = 'NXcollection'
-        for key in sorted(meta['train/electrospray']):
-            copy_meta(es, key, meta, f'train/electrospray/{key}')
-        for ax in 'xyz':
-            copy_meta(es, f'injector_{ax}', meta, f'train/injector/{ax}')
-        copy_meta(es, 'chamber_pressure', meta, 'train/chamber_pressure')
-
-        # detector
-        det = instrument.create_group('detector_1')
-        det.attrs['NX_class'] = 'NXdetector'
-        det['description'] = 'AGIPD 1M'
-        for name, val in (('distance', DET_DIST), ('x_pixel_size', pixel_size), ('y_pixel_size', pixel_size)):
-            det.create_dataset(name, data=val).attrs['units'] = 'm'
-        det.create_dataset('module_identifier', data=[f'AGIPD{m:02d}T{t}' for m in range(NMODULES) for t in range(NTILES)],
-                           dtype=h5py.string_dtype()).attrs['description'] = \
-            'tile t = rows 64t..64t+63 of AGIPD module mm; per-pixel arrays reshape (C order) to (16, 512, 128)'
-
-        ds = det.create_dataset('corner_position', data=corner)
-        ds.attrs.update(units='m', axes='module_identifier:coordinate')
-        ds = det.create_dataset('basis_vectors', data=basis)
-        ds.attrs.update(units='m', axes='module_identifier:dimension:coordinate')
-        ds = det.create_dataset('xyz_map', data=xyz, **GZ)
-        ds.attrs.update(units='m', axes='coordinate:module_identifier:y:x',
-                        description='pixel centre positions (same geometry as corner_position/basis_vectors)')
-        det.create_dataset('quadrant', data=['Q1', 'Q2', 'Q3', 'Q4'], dtype=h5py.string_dtype()).attrs['description'] = \
-            'quadrant q is modules 4q..4q+3, i.e. tiles (module_identifier) 32q..32q+31'
-        ds = det.create_dataset('quadrant_correction', data=quadrant_correction)
-        ds.attrs.update(units='m', axes='quadrant:coordinate',
-                        description='alternative geometry used in the 3D reconstructions: add quadrant_correction[q] to '
-                                    'the positions of the tiles in quadrant q; fitted to the data, not supported by an '
-                                    'independent refinement')
-
-        ds = det.create_dataset('mask', data=mask, **GZ)
-        ds.attrs['axes'] = 'module_identifier:y:x'
-        ds.attrs['bit_definitions'] = mask_defs
+        entry, instrument = write_header(
+            g, expid, f'p{PROPOSAL:06d} {sample_name} hits, runs {runs[0]}-{runs[-1]}',
+            args.description, 'make_publication_cxi.py', timestamps, sample_name)
+        write_beam_and_injector(instrument, meta)
+        det = write_detector_static(instrument, geometry, mask, mask_defs)
 
         # frames, reshaped into tiles; accumulate the powder on the way
         src = f[f'{DET}/data']
@@ -477,19 +610,11 @@ def main():
             frames = to_tiles(src[i:i + block])
             dst[i:i + block] = frames
             powder += frames.sum(0, dtype=np.uint64)
-        dst.attrs.update(axes='experiment_identifier:module_identifier:y:x', signal=1, units='counts',
-                         description='photons per pixel, not masked')
-        ds = det.create_dataset('powder', data=(powder / N).astype(np.float32), **GZ)
-        ds.attrs.update(axes='module_identifier:y:x', units='counts',
-                        description=f'mean of data over all {N} events (unmasked, background included)')
+        frames_attrs(dst)
+        write_powder(det, powder, N)
         link_expid(det)
 
-        per_event(det, 'start_time', timestamps.astype(object), description='train timestamp (ISO 8601)')
-        per_event(det, 'run', run)
-        per_event(det, 'trainId', trainId.astype(np.uint64))
-        per_event(det, 'cellId', cellId.astype(np.uint16))
-        copy_meta(det, 'pulseId', meta, 'pulseId')
-        per_event(det, 'vds_index', f['entry_1/vds_index'][()], description='frame index in the per-run VDS file')
+        write_event_ids(det, meta, timestamps, run, trainId, cellId, f['entry_1/vds_index'][()])
 
         # background
         ds = det.create_dataset('data_white', data=to_tiles(background), chunks=(1,) + mask.shape, **GZ)
@@ -512,15 +637,7 @@ def main():
             per_event(score, name, f[key][()], description=desc)
         per_event(score, 'background_counts', background_counts.astype(np.float32),
                   description='sum over pixels of background_weighting * data_white[background_index]')
-        for name, key in (('facility_hitscore', 'pulse/hitfinder_hitscore'),
-                          ('facility_hit_flag', 'pulse/hitfinder_hitFlag'),
-                          ('facility_miss_flag', 'pulse/hitfinder_missFlag'),
-                          ('facility_threshold_mu', 'train/hitfinder_threshold_mu'),
-                          ('facility_threshold_sigma', 'train/hitfinder_threshold_sig'),
-                          ('facility_lit_pixels', 'pulse/litpx_litPixels'),
-                          ('facility_total_intensity', 'pulse/litpx_totalIntensity'),
-                          ('facility_unmasked_pixels', 'pulse/litpx_unmaskedPixels')):
-            copy_meta(score, name, meta, key)
+        write_facility_scores(score, meta)
 
         # manual selection as CXI tags
         if 'manual_selection' in f:
@@ -532,38 +649,8 @@ def main():
             ds.attrs['axes'] = 'tag:experiment_identifier'
             ds.attrs['description'] = 'manual selection, 1 = tagged'
 
-        # AGIPD motors
-        motors = det.create_group('motors')
-        motors.attrs['NX_class'] = 'NXcollection'
-        for key in sorted(meta['train/agipd_motors']):
-            copy_meta(motors, key, meta, f'train/agipd_motors/{key}')
-
-        # geometry provenance
-        note = det.create_group('note_1')
-        note.attrs['NX_class'] = 'NXnote'
-        note['file_name'] = os.path.basename(REFERENCE_GEOM)
-        note['description'] = (
-            'Detector geometry: facility reference geometry (this file) moved to the recorded AGIPD quadrant '
-            f'motor positions with extra_geom.motors.AGIPD_1MMotors ({os.path.relpath(geom_file, ROOT)}); '
-            'the motor positions are constant for all runs in this file. '
-            f'Pixel positions are then shifted by {BEAM_CENTRE_SHIFT[:2].tolist()} m in x, y '
-            '(mean beam centre correction from the data, consistent with an independent crystallographic '
-            'refinement) and z is set to the detector distance. quadrant_correction gives the per-quadrant '
-            'alternative used in the 3D reconstructions.')
-        with open(os.path.join(ROOT, REFERENCE_GEOM)) as gf:
-            note['data'] = gf.read()
-
-        data_1 = entry.create_group('data_1')
-        data_1.attrs['NX_class'] = 'NXdata'
-        data_1['data'] = h5py.SoftLink(f'/{DET}/data')
-        link_expid(data_1)
-
-        process = entry.create_group('process_1')
-        process.attrs['NX_class'] = 'NXprocess'
-        process['program'] = 'make_publication_cxi.py'
-        process['version'] = git_version()
-        process['date'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        process['command'] = ' '.join(sys.argv)
+        write_motors_and_note(det, meta, geom_file)
+        write_footer(entry, 'make_publication_cxi.py')
 
     print(f'written {args.output}')
 
