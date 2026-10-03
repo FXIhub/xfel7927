@@ -27,6 +27,8 @@ Usage (on maxwell, after source ../source_this_at_euxfel; use an srun/sbatch nod
     python get_event_metadata.py --list 600     # print available injector sources/keys/units
     python get_event_metadata.py                # write sidecar for the default Ery file
     python get_event_metadata.py -i <cxi> -o <h5> -s <sample substring> [--runs 600 601]
+    python get_event_metadata.py --merge r0033.h5 r0034.h5 ... -o <h5>   # combine per-run outputs
+    (submit_event_metadata_array.sh runs one job per run and then the merge)
 """
 import argparse
 import json
@@ -345,17 +347,73 @@ def background_weighting(run, dc, ev, vds_index, trainId, cellId, out):
     out.set('pulse/background_train_factor', ev, a_d[v], '', src, 'a_t')
 
 
+def merge(fnams, output):
+    """Combine per-run output files (each with the full event axis, filled only
+    for the events of its runs) into one file. Every event must be filled by
+    exactly one file."""
+    with h5py.File(fnams[0]) as f:
+        N = f['run'].shape[0]
+        input_file = f.attrs['input']
+    event_run = np.zeros(N, dtype=np.uint16)
+    event_time = np.full(N, '', dtype=object)
+    data, attrs, runs = {}, {}, []
+    for fnam in tqdm(fnams, desc='merging'):
+        with h5py.File(fnam) as f:
+            assert f['run'].shape[0] == N and f.attrs['input'] == input_file, f'{fnam} was made for a different input'
+            run = f['run'][()]
+            sel = run > 0
+            assert not np.any(event_run[sel]), f'{fnam} overlaps with another file'
+            event_run[sel] = run[sel]
+            event_time[sel] = f['timestamp'].asstr()[()][sel]
+            def collect(name, ds):
+                if not isinstance(ds, h5py.Dataset) or ds.shape != (N,) or name in ('run', 'timestamp'):
+                    return
+                if name not in data:
+                    fill = np.nan if ds.dtype.kind == 'f' else (-1 if ds.dtype.kind == 'i' else 0)
+                    data[name] = np.full(N, fill, dtype=ds.dtype)
+                    attrs[name] = dict(ds.attrs)
+                data[name][sel] = ds[()][sel]
+            f.visititems(collect)
+            runs += list(zip(f['runs/run'][()], f['runs/first_train'][()], f['runs/last_train'][()],
+                             f['runs/start_time'].asstr()[()]))
+
+    missing = np.sum(event_run == 0)
+    if missing:
+        sys.exit(f'{missing} events not filled by any file (runs with no output?)')
+
+    runs.sort()
+    with h5py.File(output, 'w') as f:
+        f.attrs['input'] = input_file
+        f['run'] = event_run
+        f.create_dataset('timestamp', data=list(event_time.astype(str)), dtype=h5py.string_dtype())
+        for name, v in data.items():
+            ds = f.create_dataset(name, data=v, compression='gzip')
+            for k, a in attrs[name].items():
+                ds.attrs[k] = a
+        r = list(zip(*runs))
+        f['runs/run']         = np.array(r[0], dtype=np.uint16)
+        f['runs/first_train'] = np.array(r[1], dtype=np.uint64)
+        f['runs/last_train']  = np.array(r[2], dtype=np.uint64)
+        f.create_dataset('runs/start_time', data=list(r[3]), dtype=h5py.string_dtype())
+    print(f'merged {len(fnams)} files, {len(runs)} runs contribute events; written {output}')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Collect per-event run number, timestamp, pulse-resolved and per-train metadata for a merged cxi file')
     parser.add_argument('--list', type=int, metavar='RUN', help='list injector sources and keys for RUN and exit')
     parser.add_argument('-i', '--input', default=f'{PREFIX}scratch/saved_hits/Ery_all_hits_no_mask.cxi')
     parser.add_argument('-o', '--output', default=f'{PREFIX}scratch/saved_hits/Ery_event_metadata.h5')
     parser.add_argument('-s', '--sample', default='Ery', help='substring of the run table sample name')
-    parser.add_argument('--runs', type=int, nargs='+', help='only process these runs (for testing)')
+    parser.add_argument('--runs', type=int, nargs='+', help='only process these runs (e.g. one run per job, then --merge)')
+    parser.add_argument('--merge', nargs='+', metavar='FILE', help='merge per-run output files into --output and exit')
     args = parser.parse_args()
 
     if args.list is not None:
         list_sources(args.list)
+        return
+
+    if args.merge:
+        merge(args.merge, args.output)
         return
 
     with h5py.File(args.input) as f:
@@ -401,7 +459,7 @@ def main():
         process_run(dc, ev, cellId, trainId, out)
 
     missing = np.sum(event_run == 0)
-    if missing:
+    if missing and not args.runs:
         print(f'WARNING: {missing} events not matched to any run', file=sys.stderr)
 
     with h5py.File(args.output, 'w') as f:
@@ -412,7 +470,7 @@ def main():
             ds = f.create_dataset(name, data=v, compression='gzip')
             for k, a in out.attrs[name].items():
                 ds.attrs[k] = a
-        r = list(zip(*run_rows))
+        r = list(zip(*run_rows)) or [[], [], [], []]
         f['runs/run']         = np.array(r[0], dtype=np.uint16)
         f['runs/first_train'] = np.array(r[1], dtype=np.uint64)
         f['runs/last_train']  = np.array(r[2], dtype=np.uint64)
